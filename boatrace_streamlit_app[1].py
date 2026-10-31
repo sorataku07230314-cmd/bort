@@ -1,33 +1,56 @@
 # -*- coding: utf-8 -*-
 """
-🚤 ボートレース プロ展開シミュレーター (Streamlit Webアプリ完全版)
-====================================================================
+🚤 ボートレース プロ展開シミュレーター (Streamlit Webアプリ完全版・自動ライブラリ導入対応)
+========================================================================================
 【特徴】
-1. Pythonサーバー側でBOAT RACE公式サイト(出走表 racelist / 直前情報 beforeinfo)と直接通信するため、
+1. Streamlit Cloud上で requirements.txt が読み込まれなかった場合でも、自動で /tmp に
+   beautifulsoup4 と requests をインストールして起動する自己修復機能付きです。
+2. Pythonサーバー側でBOAT RACE公式サイト(出走表 racelist / 直前情報 beforeinfo)と直接通信するため、
    ブラウザのCORS制限が一切なく、ボタン1つで全24場・全12Rのデータを100%自動取得＆即時反映します。
-2. 取得したデータは st.session_state に保存され、画面上の編集テーブルで「コース別1着率/3連対率」
-   「2C逃がし率」「展示タイム」「想定ST」「手動戦法(逃げ/まくり/まくり差し/差し/外マイ/壁崩壊)」を
-   自在に微調整できます。
 3. 5段階プロ展開計算エンジン・重み付けスライダー・配分点数(4点/6点/8点/12点)・軍資金配分・
    note / X (Twitter) そのままコピペ用レポート出力をすべて1画面に統合しています。
-
-【ローカルPCでの起動方法】
-  pip install streamlit requests beautifulsoup4 pandas
-  streamlit run boatrace_streamlit_app.py
-
-【無料Web公開 (スマホ・PCからいつでもアクセスする方法)】
-  GitHubにこのファイルと requirements.txt (streamlit, requests, beautifulsoup4, pandas) を上げ、
-  Streamlit Community Cloud (https://share.streamlit.io/) に連携すると初期費用・維持費0円でWebサイト化できます。
 """
 
 import datetime
 import json
+import os
 import re
+import subprocess
+import sys
 from typing import Dict, List, Tuple
 
-from bs4 import BeautifulSoup
+# ---------------------------------------------------------
+# 0. 自動ライブラリ導入（requirements.txt が無くてもエラーにならない安全装置）
+# ---------------------------------------------------------
+try:
+    from bs4 import BeautifulSoup
+    import requests
+except ModuleNotFoundError:
+    _pkg_dir = "/tmp/boatrace_pkgs"
+    os.makedirs(_pkg_dir, exist_ok=True)
+    if _pkg_dir not in sys.path:
+        sys.path.insert(0, _pkg_dir)
+    try:
+        from bs4 import BeautifulSoup
+        import requests
+    except ModuleNotFoundError:
+        subprocess.check_call(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--target",
+                _pkg_dir,
+                "--quiet",
+                "beautifulsoup4",
+                "requests",
+            ]
+        )
+        from bs4 import BeautifulSoup
+        import requests
+
 import pandas as pd
-import requests
 import streamlit as st
 
 # ---------------------------------------------------------
@@ -277,7 +300,6 @@ def run_pro_simulation(
     w_series = {1: 0.0, 2: 0.30, 3: 0.55, 4: 0.65, 5: 0.75, 6: 0.85}.get(series_day, 0.5)
     w_base = 1.0 - w_series
 
-    # 展示タイム順位の計算
     sorted_by_ex = sorted(boats_list, key=lambda x: x["exhibitTime"])
     ex_ranks = {}
     for idx, b in enumerate(sorted_by_ex):
@@ -353,7 +375,6 @@ def run_pro_simulation(
             "tac": tac,
         }
 
-    # イン補正 ＆ 2コース逃がし率連動
     course_eval[1]["firstScore"] += 28 + v["inMod"]
     if deep_in == "semi":
         course_eval[1]["firstScore"] -= 8
@@ -362,7 +383,6 @@ def run_pro_simulation(
     if rules["nigashiLink"] and 2 in course_eval:
         course_eval[1]["firstScore"] += (course_eval[2]["b"]["nigashi"] - 52.0) * 0.45 * weights["wCourse"]
 
-    # 風向・風速・波高補正
     if wind_dir == "head" and wind_speed >= 4:
         course_eval[1]["firstScore"] -= (wind_speed - 3) * 2.5
         if kado_course in course_eval:
@@ -376,7 +396,6 @@ def run_pro_simulation(
     if wave_cm >= 5 and 2 in course_eval:
         course_eval[2]["placeScore"] += 6
 
-    # 手動戦法・自動スリット攻防の連動計算
     manual_notes: List[str] = []
     for c in range(1, 7):
         obj = course_eval[c]
@@ -445,7 +464,6 @@ def run_pro_simulation(
 def main():
     st.set_page_config(page_title="BOAT RACE プロ展開シミュレーター", page_icon="🚤", layout="wide")
 
-    # 初期データ (2026/10/30 尼崎12R SGボートレースダービー実データ)
     if "boats_data" not in st.session_state:
         st.session_state["boats_data"] = [
             {"id": 1, "name": "茅原悠紀", "grade": "A1", "fCount": 0, "weight": 53.4, "winRate": 7.61, "localWin": 8.21, "motorBi": 26.57, "avgSt": 0.13, "seriesSt": 0.11, "courseWin": 78.5, "courseTri": 88.0, "nigashi": 0.0,  "exhibitTime": 6.80, "tilt": 0.0,  "parts": "none", "tactic": "auto"},
@@ -460,7 +478,6 @@ def main():
         st.session_state["wave_cm"] = 0
         st.session_state["fetch_msg"] = "初期データ表示中（2026/10/30 尼崎12R SGボートレースダービー）"
 
-    # サイドバー：マイ予想ロジック＆重み付け設定
     with st.sidebar:
         st.header("⚙️ マイ予想ロジック調整")
         st.caption("各ファクターの比重（0%〜200%）と展開ルールをリアルタイム調整できます。")
@@ -492,7 +509,6 @@ def main():
     st.title("🚤 ボートレース プロ展開シミュレーター (Streamlit Python連携版)")
     st.caption("Pythonサーバーから直接BOAT RACE公式データを取得するためCORS制限ゼロで全場・全Rを自動反映します。")
 
-    # 上段：公式データ自動取得バー
     col_d, col_v, col_r, col_day, col_btn = st.columns([1.2, 2.2, 1.0, 1.4, 2.2])
     with col_d:
         target_date = st.text_input("開催日 (YYYYMMDD)", value="20261030")
@@ -530,7 +546,6 @@ def main():
 
     st.info(st.session_state.get("fetch_msg", ""))
 
-    # 水面・進入・カド設定バー
     c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
         course_order_str = st.text_input("進入並び (COURSE_ORDER)", value=st.session_state["course_order_str"])
@@ -554,7 +569,6 @@ def main():
         wind_speed = st.slider("風速 (m)", 0, 10, int(st.session_state.get("wind_speed", 2)))
         wave_cm = int(st.session_state.get("wave_cm", 2))
 
-    # 中段：6艇データのインタラクティブ編集＆手動戦法指定
     st.subheader("🚤 出走データ・コース別実績・手動戦法 (MANUAL_TACTICS) 編集")
     st.caption("表の数値を直接書き換えるか、右端の『tactic (手動戦法)』を切り替えると即座に下の展開予想へ反映されます。")
 
@@ -586,7 +600,6 @@ def main():
 
     boats_current = edited_df.to_dict(orient="records")
 
-    # シミュレーション実行
     course_eval, manual_notes, v_info = run_pro_simulation(
         boats_current,
         venue_code,
@@ -615,7 +628,6 @@ def main():
     r_for_top3 = [x for x in by_place if x["boatId"] != top3["boatId"]]
     r1, r2 = r_for_top3[0], r_for_top3[1]
 
-    # 下段：スリット隊形図 ＆ 総合算出スコア
     col_slit, col_score = st.columns([1.0, 1.2])
     with col_slit:
         st.subheader("📊 想定スリット隊形 (右端＝スリットライン)")
@@ -664,7 +676,6 @@ def main():
             )
         st.dataframe(pd.DataFrame(score_rows), hide_index=True, use_container_width=True)
 
-    # 推奨3連単買い目 ＆ 軍資金配分（4点 / 6点 / 8点 / 12点 完全連動）
     st.divider()
     col_bet_hdr1, col_bet_hdr2, col_bet_hdr3 = st.columns([2.0, 1.0, 1.0])
     with col_bet_hdr1:
