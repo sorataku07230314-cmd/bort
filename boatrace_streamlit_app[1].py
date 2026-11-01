@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-🚤 ボートレース プロ展開シミュレーター PHASE 2 PRO Complete (全機能統合・2パターン展開＆G1限定成績対応版)
+🚤 ボートレース プロ展開シミュレーター PHASE 2 PRO Complete (全機能統合・2パターン展開＆G1限定成績＆収益化出力対応版)
 ========================================================================================
-これまでの全バージョンの長所に加え、以下のプロ予想機能を完全統合した Streamlit Webアプリです：
+これまでの全バージョンの長所に加え、以下のプロ予想・収益化機能を完全統合した Streamlit Webアプリです：
 
-【新規追加・強化された4大機能】
+【新規追加・強化された5大機能】
 1. [2パターン展開予想（🟦パターンA：イン逃げ本線 ／ 🟥パターンB：イン逃げ以外・逆転波乱）]
    ・インコースが押し切る「イン逃げパターン」と、まくり・差し・まくり差し・展開待ちでインが敗れる
      「イン逃げ以外パターン」の2系統で1マーク展開・スジ連動・3連単買い目・資金配分を同時算出！
@@ -15,9 +15,9 @@
    ・公式ページからレースグレード(SG / PG1 / G1 / G2 / G3 / 一般)を自動判定（手動切替も可能）。
    ・G1・PG1・SG選択時は、一般戦・G3での「B級相手のかさ増し勝率・コース実績」を除外し、
      「G1以上限定勝率・G1コース別1着率/3連対率・G1平均ST」のみを予想エンジンに適用！
-4. [📋 長文プロ展開予想レポート ＆ 📝 note / X 投稿用長文レポート]
-   ・①水面気象＆グレード環境分析、②進入＆スリット隊形・壁強度診断、③機力・展示気配・1M全6艇の攻め手解説、
-     ④【パターンA：イン逃げ】と【パターンB：イン逃げ以外】の2パターン詳細根拠まで徹底解説。
+4. [📋 長文プロ展開予想レポート ＆ 💰 収益化（note有料販売 / X集客告知）ワンタップ出力]
+   ・①💰note有料記事モード（無料公開パート＋🔒有料ライン分割＋別々コピーボタン）、
+     ②📣X(Twitter)先出し集客・note誘導ポストモード、③📝全文一括モードを自在に切替可能！
 """
 
 import datetime
@@ -67,11 +67,7 @@ except ModuleNotFoundError:
         from urllib3.util.retry import Retry
 
 import streamlit as st
-import streamlit.components.v1 as components
-
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+import streamlit.compoｇ; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     )
 }
@@ -158,7 +154,6 @@ def estimate_g1_stats(boat_no: int, grade: str, win_rate: float, local_win: floa
 
     g1_local = round(max(3.80, g1_win + (local_win - win_rate) * 0.75), 2)
     g1_skill_ratio = max(0.45, min(1.45, g1_win / 6.30))
-    # G1以上のコース別1着率基準（記念ではインでも簡単には逃げられず、センター・カドの一撃や差しが増える）
     g1_base_1st_map = {1: 62.0, 2: 16.5, 3: 15.0, 4: 13.5, 5: 7.5, 6: 3.5}
     g1_c_win = round(min(88.0, max(1.5, g1_base_1st_map[boat_no] * g1_skill_ratio)), 1)
     g1_c_tri = round(min(90.0, max(15.0, (tri_rate * 0.86) + (4 - boat_no) * 4.2)), 1)
@@ -231,7 +226,6 @@ def fetch_race_data_from_official(hd: str, jcd: str, rno: int) -> dict:
             toban = toban_m.group(1) if toban_m else "0000"
             grade = toban_m.group(2) if toban_m else "B1"
 
-            # 選手名抽出（顔写真リンクの空文字をスキップ）
             name = ""
             name_tag = tbody.select_one("div.is-fs18")
             if name_tag:
@@ -461,7 +455,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         <div class="flex items-center gap-2">
           <span class="bg-sky-500 text-slate-950 font-black px-2 py-0.5 rounded text-xs">PHASE 2 PRO Complete</span>
           <h1 class="text-sm md:text-base font-bold text-white">
-            ボートレース展開シミュレーター（2パターン予想・G1限定成績対応）
+            🎓 ぼーとだいがくせい｜ボートレース展開シミュレーター PHASE 2 PRO
           </h1>
           <span id="g1ActiveHeaderBadge" class="hidden text-[11px] font-black bg-amber-500 text-slate-950 px-2 py-0.5 rounded shadow">
             🏆 G1以上限定成績 適用中
@@ -488,6 +482,12 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           <button onclick="loadHeiwajimaPreset()" class="bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/40 px-2 py-1 rounded">
             サンプル復元
           </button>
+          <a href="https://x.com/Boatrace__daisu" target="_blank" rel="noopener" class="bg-slate-950 hover:bg-slate-800 text-white border border-slate-600 px-2 py-1 rounded font-bold">
+            𝕏 @Boatrace__daisu
+          </a>
+          <a href="https://note.com/boatrace__daisu" target="_blank" rel="noopener" class="bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/50 px-2 py-1 rounded font-bold">
+            📓 noteマイページ
+          </a>
         </div>
       </div>
     </header>
@@ -774,18 +774,34 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             <div id="recommendationsContainer" class="space-y-2"></div>
           </div>
 
-          <!-- note / X (Twitter) そのままコピペ用 長文レポート -->
-          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
-            <div class="flex items-center justify-between">
-              <h2 class="text-xs font-bold text-amber-300">📝 note / X (Twitter) そのままコピペ用 長文展開レポート（2パターン収録）</h2>
-              <button onclick="copyNoteReport()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-2.5 py-1 rounded text-[11px] shadow">
-                レポート全文をコピー
-              </button>
+          <!-- 💰 収益化・note有料記事 / X集客ポスト そのままコピペ用レポート -->
+          <div class="bg-slate-900 border-2 border-amber-500/40 rounded-xl p-3 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 class="text-xs font-bold text-amber-300">💰 収益化・配信用レポート出力（note有料販売 / X集客ポスト / 全文）</h2>
+                <span class="text-[10px] text-slate-400">noteの「無料公開エリア」と「🔒有料ライン以降」を自動分割してワンタップコピー可能</span>
+              </div>
+              <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                <select id="reportFormatSelect" onchange="runSimulation()" class="font-bold text-amber-200 border-amber-500/50">
+                  <option value="note_paywall" selected>💰 note有料販売用(無料＋🔒有料分割)</option>
+                  <option value="x_promo">📣 X(旧Twitter)先出し集客・誘導用</option>
+                  <option value="full_report">📝 全文一括レポート(サロン/自分用)</option>
+                </select>
+                <button onclick="copyNotePart('free')" class="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-600/40 font-bold px-2 py-1 rounded text-[11px]" title="無料公開パートのみコピー">
+                  無料部コピー
+                </button>
+                <button onclick="copyNotePart('paid')" class="bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-600/40 font-bold px-2 py-1 rounded text-[11px]" title="有料パートのみコピー">
+                  🔒有料部コピー
+                </button>
+                <button onclick="copyNoteReport()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-2.5 py-1 rounded text-[11px] shadow">
+                  全文コピー
+                </button>
+              </div>
             </div>
             <div id="copyNoteToast" class="hidden text-[11px] text-emerald-300 bg-emerald-950/70 border border-emerald-700/50 rounded px-2 py-1">
-              note / X 投稿用長文レポートをクリップボードにコピーしました！
+              レポートをクリップボードにコピーしました！
             </div>
-            <textarea id="noteReportTextarea" rows="16" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-[11px] font-mono text-slate-200 leading-relaxed focus:outline-none"></textarea>
+            <textarea id="noteReportTextarea" rows="18" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-[11px] font-mono text-slate-200 leading-relaxed focus:outline-none"></textarea>
           </div>
         </section>
       </div>
@@ -823,6 +839,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
 
       let boatsData = {};
       let allDetailsOpen = false;
+      let latestReportParts = { free: "", paid: "", full: "" };
 
       function isG1ModeActive() {
         const grade = document.getElementById("raceGradeSelect")?.value || "ippan";
@@ -1141,7 +1158,6 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         const raceGrade = document.getElementById("raceGradeSelect")?.value || "ippan";
         const g1Active = isG1ModeActive();
 
-        // G1以上バッジ・通知バーの表示切替
         const g1HeaderBadge = document.getElementById("g1ActiveHeaderBadge");
         const g1NoticeBar = document.getElementById("g1RuleNoticeBar");
         const scoreModeBadge = document.getElementById("scoreModeBadge");
@@ -1185,7 +1201,6 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           const isDash = courseNo >= kadoCourse;
           const isKado = courseNo === kadoCourse;
 
-          // G1以上レース時はG1以上の成績のみを適用
           const effWinRate = g1Active ? (b.g1WinRate ?? b.winRate) : b.winRate;
           const effLocalWin = g1Active ? (b.g1LocalWin ?? b.localWin) : b.localWin;
           const effCourseWin = g1Active ? (b.g1CourseWin ?? b.courseWin) : b.courseWin;
@@ -1407,7 +1422,6 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           }
         }
 
-        // AI自動判定の1M攻め手割り当て（未指定艇に差し・まくり差し・外マイ・展開待ちを自動付与）
         for (let c = 1; c <= 6; c++) {
           const obj = courseEval[c];
           if (c >= 2) {
@@ -1571,18 +1585,13 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         const arr = Object.values(courseEval);
         const inObj = courseEval[1];
         const c2Obj = courseEval[2];
-        const c3Obj = courseEval[3];
         const kadoObj = courseEval[kadoCourse] || courseEval[4];
-        const outerObj = courseEval[kadoCourse + 1] || courseEval[5];
 
-        // ---------------------------------------------------------
-        // 1. パターンA（イン逃げ：1コース1着）専用連対スコアと買い目
-        // ---------------------------------------------------------
         const inFollowers = arr
           .filter(x => x.courseNo !== 1)
           .map(x => {
             let s = x.placeScore;
-            if (x.courseNo === 2 && x.attackType !== "hekomi") s += 10; // 2コース差し残り
+            if (x.courseNo === 2 && x.attackType !== "hekomi") s += 10;
             if (x.courseNo === 3 && ["sotomai", "makurisashi", "sashi"].includes(x.attackType)) s += 8;
             if (x.attackType === "sashi") s += 7;
             if (x.attackType === "tenkaimachi") s += 6;
@@ -1592,9 +1601,6 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
 
         const inP1 = inFollowers[0], inP2 = inFollowers[1], inP3 = inFollowers[2], inP4 = inFollowers[3];
 
-        // ---------------------------------------------------------
-        // 2. パターンB（イン逃げ以外：2〜6コース1着）専用スコアと買い目
-        // ---------------------------------------------------------
         const nonInWinners = arr
           .filter(x => x.courseNo !== 1)
           .map(x => {
@@ -1607,25 +1613,21 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           })
           .sort((a, b) => b.nonInWinScore - a.nonInWinScore);
 
-        const nonIn1 = nonInWinners[0]; // 非イン筆頭アタマ
-        const nonIn2 = nonInWinners[1]; // 非イン対抗アタマ
+        const nonIn1 = nonInWinners[0];
+        const nonIn2 = nonInWinners[1];
 
-        // nonIn1 が勝つときのスジ連動ヒモ候補（イン残し＋外連動・展開待ち）
         const nonIn1Followers = arr
           .filter(x => x.boatId !== nonIn1.boatId)
           .map(x => {
             let s = x.placeScore;
             if (nonIn1.attackType === "makuri") {
-              // まくり時は外隣コース・展開待ちが急浮上、内枠は減点
               if (x.courseNo === nonIn1.courseNo + 1) s += 22;
               if (x.courseNo === nonIn1.courseNo + 2 || x.attackType === "tenkaimachi") s += 16;
               if (x.courseNo < nonIn1.courseNo) s -= 12;
             } else if (nonIn1.attackType === "sashi" || nonIn1.attackType === "makurisashi") {
-              // 差し・まくり差し時は1コースが2・3着に残りやすい
               if (x.courseNo === 1) s += 20;
               if (x.attackType === "tenkaimachi") s += 12;
             } else if (nonIn1.attackType === "tenkaimachi") {
-              // 展開待ち1着時は攻めた艇やインが2・3着
               if (x.courseNo === 1 || x.isKado) s += 14;
             }
             return { ...x, followScore: s };
@@ -1646,7 +1648,6 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
 
         const ng1 = nonIn2Followers[0], ng2 = nonIn2Followers[1];
 
-        // 展示トップ艇・気配注目艇の抽出
         const exBest = [...arr].sort((a, b) => (a.b.exTime || 6.80) - (b.b.exTime || 6.80))[0];
         const motorBest = [...arr].sort((a, b) => (b.b.motorBi || 35) - (a.b.motorBi || 35))[0];
         const waitBoats = arr.filter(x => x.attackType === "tenkaimachi" || x.roleText.includes("展開待"));
@@ -1664,9 +1665,6 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             ? "🎯 手動戦法連動 × 2パターン精密診断"
             : `🟦イン逃げ ${kimariteStats.inEscapePct}% vs 🟥非イン逆転 ${kimariteStats.nonInPct}%`;
 
-        // ---------------------------------------------------------
-        // 3. UI内の長文プロ展開予想レポート生成
-        // ---------------------------------------------------------
         const sashiNames = sashiBoats.map(x => `${x.courseNo}C:${x.boatId}号艇${x.b.name}`).join("・") || `${c2Obj.courseNo}C:${c2Obj.boatId}号艇${c2Obj.b.name}`;
         const waitNames = waitBoats.map(x => `${x.courseNo}C:${x.boatId}号艇${x.b.name}`).join("・") || `${courseEval[5].boatId}号艇${courseEval[5].b.name}・${courseEval[6].boatId}号艇${courseEval[6].b.name}`;
 
@@ -1701,9 +1699,6 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         `;
         document.getElementById("aiNarrativeBox").innerHTML = longHtml;
 
-        // ---------------------------------------------------------
-        // 4. パターンA（イン逃げ）＆ パターンB（イン逃げ以外）の3連単買い目プール構築
-        // ---------------------------------------------------------
         const nameOf = (id) => (boatsData[id]?.name || `${id}`).split(" ")[0];
 
         const patternABetsPool = [
@@ -1734,7 +1729,6 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         } else if (patternMode === "non_in_only") {
           selectedBets = patternBBetsPool.slice(0, Math.min(6, ticketCount));
         } else {
-          // 2パターン同時表示：点数の半分をパターンA(イン逃げ)、半分をパターンB(イン逃げ以外)に割り当て
           const halfA = Math.ceil(ticketCount / 2);
           const halfB = Math.floor(ticketCount / 2);
           selectedBets = [...patternABetsPool.slice(0, halfA), ...patternBBetsPool.slice(0, halfB)];
@@ -1798,46 +1792,86 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           renderBetGroup(`🟥 パターンB：イン逃げ以外予想（${nonIn1.boatId}号艇${nonIn1.b.name}・${nonIn2.boatId}号艇${nonIn2.b.name} 差し・まくり・展開待ち逆転 / 成立率 ${kimariteStats.nonInPct}%）`, "bg-rose-950/80 text-rose-300 border border-rose-600/40", groupB);
 
         // ---------------------------------------------------------
-        // 5. note / X (Twitter) そのままコピペ用 長文レポート更新
+        // 5. 収益化・配信テンプレート出力（note有料分割 / X集客ポスト / 全文）
         // ---------------------------------------------------------
-        const aCombos = groupA.map(x => `${x.b.combo} (${x.b.runners} / ${allocs[x.idx]}円)`).join("\n  ・");
-        const bCombos = groupB.map(x => `${x.b.combo} (${x.b.runners} / ${allocs[x.idx]}円)`).join("\n  ・");
+        const aCombos = groupA.map(x => `${x.b.combo} (${x.b.runners} / 推奨${allocs[x.idx]}円)`).join("\n  ・");
+        const bCombos = groupB.map(x => `${x.b.combo} (${x.b.runners} / 推奨${allocs[x.idx]}円)`).join("\n  ・");
         const manualLine = manualNotes.length > 0 ? `・手動指定戦法: ${manualNotes.join(" / ")}` : `・1M攻め手判定: 差し勢[${sashiNames}] ／ 展開待ち勢[${waitNames}]`;
         const g1ReportLine = g1Active
           ? `・成績適用基準: 🏆${raceGrade}限定モード（一般戦実績を除外しG1以上の勝率・コース実績・STのみ適用）`
           : `・成績適用基準: ${raceGrade === "ippan" ? "一般戦/G3" : raceGrade} 通算＋節間ブレンド基準`;
 
-        const noteText = [
+        const freePartText = [
           `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-          `🚤 ${venue.name} ${raceNo}R 【${raceGrade === "ippan" ? "一般/G3" : raceGrade}】 プロ展開予想レポート`,
+          `🎓 ぼーとだいがくせい｜${venue.name} ${raceNo}R 【${raceGrade === "ippan" ? "一般/G3" : raceGrade}】自作シミュレーター徹底解析`,
           `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
           `■ 1. 水面・気象環境 ＆ グレード適用基準`,
           `・水面特性: ${venue.name}（${venue.desc}）`,
           `・気象条件: ${windLabel} ／ 波高${wave}cm ／ ${tideLabel}`,
           g1ReportLine,
           ``,
-          `■ 2. 進入隊形・スリット展望 ＆ 機力評価`,
+          `■ 2. 進入隊形・スリット展望 ＆ 直前展示ピックアップ`,
           `・想定進入: [${arr.map(x => x.boatId).join("-")}] （${kadoCourse}コース${kadoObj.boatId}号艇・${kadoObj.b.name}がカド / イン:${deepLabel}）`,
-          `・展示一番時計: ${exBest.boatId}号艇 ${exBest.b.name} (${exBest.b.exTime.toFixed(2)}秒) ／ 注目機: ${motorBest.boatId}号艇 ${motorBest.b.name} (2連率${motorBest.b.motorBi.toFixed(1)}%)`,
+          `・展示一番時計: ${exBest.boatId}号艇 ${exBest.b.name} (${exBest.b.exTime.toFixed(2)}秒)`,
+          `・モーター2連率トップ: ${motorBest.boatId}号艇 ${motorBest.b.name} (${motorBest.b.motorBi.toFixed(1)}%)`,
+          `・決まり手予測バランス: イン逃げ ${kimariteStats.inEscapePct}% vs イン逃げ以外(差し・まくり・展開待ち) ${kimariteStats.nonInPct}%`,
           manualLine,
           ``,
-          `■ 3. 1マークの攻防（2パターン展開シナリオ）`,
-          `🟦【パターンA：イン逃げ本線シナリオ（推定確率 ${kimariteStats.inEscapePct}%）】`,
+          `▼ ここから先の有料パートでは、`,
+          `①【パターンA：イン逃げ本線】の2・3着スジ連動結論`,
+          `②【パターンB：イン逃げ以外（逆転・高配当）】の1マーク差し・展開待ち浮上ルート`,
+          `③ 期待値(EV)と確率に基づく【厳選3連単${bets.length}点＆推奨資金配分】を公開します！`
+        ].join("\n");
+
+        const paidPartText = [
+          `■ 3. 1マークの攻防（2パターン展開シナリオ結論）`,
+          `🟦【パターンA：イン逃げ本線シナリオ（推定成立率 ${kimariteStats.inEscapePct}%）】`,
           `1コース${inObj.boatId}号艇（${inObj.b.name}・想定ST .${Math.round(inObj.expectedSt * 100).toString().padStart(2, "0")}）が壁役2コース${c2Obj.boatId}号艇（逃がし率${c2Obj.b.nigashi.toFixed(1)}%）を盾に1Mを先マイ。`,
           `追走軸は${inP1.roleText}の${inP1.boatId}号艇（${inP1.b.name}）と${inP2.roleText}の${inP2.boatId}号艇（${inP2.b.name}）。3着には展開待ちから最内を突く${inP3.boatId}号艇（${inP3.b.name}）まで押さえるスジ構成。`,
           ``,
-          `🟥【パターンB：イン逃げ以外・逆転波乱シナリオ（推定確率 ${kimariteStats.nonInPct}%）】`,
+          `🟥【パターンB：イン逃げ以外・逆転波乱シナリオ（推定成立率 ${kimariteStats.nonInPct}%）】`,
           `1コースが風・波やダッシュ勢のプレッシャーで流れた場合、逆転筆頭は${nonIn1.courseNo}コース${nonIn1.boatId}号艇（${nonIn1.b.name} / ${nonIn1.roleText}）、対抗は${nonIn2.courseNo}コース${nonIn2.boatId}号艇（${nonIn2.b.name} / ${nonIn2.roleText}）。`,
-          `1Mの攻めで生じる引き波の懐を「差し」「展開待ち」で突く${nf1.boatId}号艇（${nf1.b.name}）・${nf2.boatId}号艇（${nf2.b.name}）の連動舟券で高配当を狙い撃つ。`,
+          `1Mの攻めで生じる引き波の懐を「差し」「展開待ち」で突く${nf1.boatId}号艇（${nf1.b.name}）・${nf2.boatId}号艇（${nf2.b.name}）の連動舟券で高配当を狙い撃ちます。`,
           ``,
           `🎯 4. 推奨3連単買い目・資金配分（計${bets.length}点 / 総予算${budget.toLocaleString()}円）`,
           `【🟦 パターンA：イン逃げ推奨目】`,
           `  ・${aCombos || "なし（非イン特化選択中）"}`,
           `【🟥 パターンB：イン逃げ以外（逆転・穴）推奨目】`,
           `  ・${bCombos || "なし（イン逃げ特化選択中）"}`,
+          `※直前オッズでEV(期待値)105%以上の目を厚めに推奨。舟券の購入は自己責任でお楽しみください。`,
+          `🎓 ぼーとだいがくせい｜X: https://x.com/Boatrace__daisu ｜ note: https://note.com/boatrace__daisu`,
           `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
         ].join("\n");
-        document.getElementById("noteReportTextarea").value = noteText;
+
+        const xPromoText = [
+          `🎓【ぼーとだいがくせいの展開研究室】${venue.name}${raceNo}R (${raceGrade === "ippan" ? "一般" : raceGrade}) 直前解析完了🔥`,
+          ``,
+          `✅ 水面: ${windLabel} / 波${wave}cm`,
+          `✅ 展示1番時計: ${exBest.boatId}号艇 ${exBest.b.name} (${exBest.b.exTime.toFixed(2)}s)`,
+          `✅ 想定カド: ${kadoCourse}コース(${kadoObj.boatId}号艇 ${kadoObj.b.name})`,
+          `📊 AI決まり手予測: イン逃げ【${kimariteStats.inEscapePct}%】 vs 非イン逆転【${kimariteStats.nonInPct}%】`,
+          ``,
+          `1Mの「差し」「展開待ち」連動まで計算した【イン逃げ本線】＆【非イン高配当】の2パターン結論と厳選${bets.length}点はnoteで公開中👇`,
+          `https://note.com/boatrace__daisu`,
+          `#ぼーとだいがくせい #ボートレース #競艇予想 #${venue.name}競艇`
+        ].join("\n");
+
+        const fullPaywallText = `${freePartText}\n\n--- 🔒 ここから先は有料エリア（noteの有料ラインをここに設定） ---\n\n${paidPartText}`;
+        const fullCombinedText = `${freePartText.split("▼ ここから先の有料パートでは")[0].trim()}\n\n${paidPartText}`;
+
+        latestReportParts = {
+          free: freePartText,
+          paid: paidPartText,
+          full: fullCombinedText,
+          paywall: fullPaywallText,
+          x_promo: xPromoText
+        };
+
+        const reportFmt = document.getElementById("reportFormatSelect")?.value || "note_paywall";
+        const outEl = document.getElementById("noteReportTextarea");
+        if (reportFmt === "note_paywall") outEl.value = fullPaywallText;
+        else if (reportFmt === "x_promo") outEl.value = xPromoText;
+        else outEl.value = fullCombinedText;
       }
 
       function updateEv(idx, prob, oddsVal) {
@@ -1860,6 +1894,18 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         setTimeout(() => toast.classList.add("hidden"), 2200);
       }
 
+      function copyNotePart(partType) {
+        const txt = partType === "free" ? latestReportParts.free : latestReportParts.paid;
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+        } catch (e) {}
+        const toast = document.getElementById("copyNoteToast");
+        toast.textContent = partType === "free" ? "✅ noteの【無料公開パート】をコピーしました！" : "✅ noteの【🔒有料パート（結論＆買い目）】をコピーしました！";
+        toast.classList.remove("hidden");
+        setTimeout(() => toast.classList.add("hidden"), 2500);
+      }
+
       function copyNoteReport() {
         const txt = document.getElementById("noteReportTextarea").value;
         try {
@@ -1867,6 +1913,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
         } catch (e) {}
         const toast = document.getElementById("copyNoteToast");
+        toast.textContent = "✅ 表示中のレポート全文をクリップボードにコピーしました！";
         toast.classList.remove("hidden");
         setTimeout(() => toast.classList.add("hidden"), 2200);
       }
@@ -2010,7 +2057,7 @@ def main():
 
     json_payload = json.dumps(st.session_state["server_race_data"], ensure_ascii=False)
     rendered_html = ULTIMATE_HTML_TEMPLATE.replace("__INJECTED_SERVER_DATA__", json_payload)
-    components.html(rendered_html, height=1880, scrolling=True)
+    components.html(rendered_html, height=1920, scrolling=True)
 
 
 if __name__ == "__main__":
