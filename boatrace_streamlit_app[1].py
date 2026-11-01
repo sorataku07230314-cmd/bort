@@ -67,7 +67,11 @@ except ModuleNotFoundError:
         from urllib3.util.retry import Retry
 
 import streamlit as st
-import streamlit.compoｇ; x64) AppleWebKit/537.36 "
+import streamlit.components.v1 as components
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     )
 }
