@@ -1,23 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-🚤 ボートレース プロ展開シミュレーター PHASE 2 PRO Complete (全機能統合・2パターン展開＆G1限定成績＆収益化出力対応版)
+🚤 ボートレース プロ展開シミュレーター PHASE 2 PRO Complete
 ========================================================================================
-これまでの全バージョンの長所に加え、以下のプロ予想・収益化機能を完全統合した Streamlit Webアプリです：
+🎓 ぼーとだいがくせい｜全機能統合・コース別攻め成功率・最大24点対応・My予想AI採点チェッカー搭載版
 
-【新規追加・強化された5大機能】
-1. [2パターン展開予想（🟦パターンA：イン逃げ本線 ／ 🟥パターンB：イン逃げ以外・逆転波乱）]
-   ・インコースが押し切る「イン逃げパターン」と、まくり・差し・まくり差し・展開待ちでインが敗れる
-     「イン逃げ以外パターン」の2系統で1マーク展開・スジ連動・3連単買い目・資金配分を同時算出！
-2. [1マークの攻めに「📐差し」「⏳展開待ち」を本格追加]
-   ・手動戦法選択＆AI自動判定＆スリット攻防マップに「📐差し(1M最内差し)」と
-     「⏳展開待ち(引き波・もつれ待ち連動差し)」を追加。前の艇がまくった際の展開待ち連動も精密計算。
-3. [🏆 G1以上のレースは「G1レース以上のみの成績」を自動適用]
-   ・公式ページからレースグレード(SG / PG1 / G1 / G2 / G3 / 一般)を自動判定（手動切替も可能）。
-   ・G1・PG1・SG選択時は、一般戦・G3での「B級相手のかさ増し勝率・コース実績」を除外し、
-     「G1以上限定勝率・G1コース別1着率/3連対率・G1平均ST」のみを予想エンジンに適用！
-4. [📋 長文プロ展開予想レポート ＆ 💰 収益化（note有料販売 / X集客告知）ワンタップ出力]
-   ・①💰note有料記事モード（無料公開パート＋🔒有料ライン分割＋別々コピーボタン）、
-     ②📣X(Twitter)先出し集客・note誘導ポストモード、③📝全文一括モードを自在に切替可能！
+【搭載機能一覧】
+1. [⚔️ コース別の攻め方 ＆ 決まり手成功率（2Cまくり率/差し率、3〜6Cまくり/まくり差し/差し/展開待ち率）]
+   ・各コース(1C〜6C)ごとの「逃げ率・差し率・まくり率・まくり差し率・展開待ち連対率」を選手データから自動算出＆手動調整可能。
+   ・当日の風向・風速・潮位・ST差・カド位置を加味した「コース別 1M攻め方＆リアルタイム成功率マトリクス」を表示。
+2. [🎯 推奨買い目点数を4点〜最大24点まで大幅拡充（6点上限を完全撤廃）]
+   ・パターンA（イン逃げ：最大20通り）とパターンB（イン逃げ以外：最大30通り）の全組み合わせを確率順に生成。
+   ・4点 / 6点 / 8点 / 10点 / 12点 / 14点 / 16点 / 18点 / 20点 / 24点（＋任意の自由点数入力）に完全対応。
+3. [🧐 自分の予想を入力してAIが100点満点で採点・スジ診断する「My予想AI評価チェッカー」]
+   ・自分の買い目（単発 `1-2-3` やフォーメーション `1-23-2345`、ボタン選択）と想定展開を入力すると、
+     AIが「総合ランク(S〜D)・100点満点スコア」「1点ごとのスジ整合性＆推定確率」「抜けている危険な死角買い目（抜け目警告）」を即座に診断！
+4. [🏆 G1以上はG1限定成績のみ適用 ＆ 🟦イン逃げ vs 🟥イン逃げ以外の2パターン予想 ＆ 💰note/X収益化出力]
 """
 
 import datetime
@@ -143,11 +140,7 @@ def detect_race_grade_from_soup(soup: BeautifulSoup) -> tuple[str, str]:
 
 
 def estimate_g1_stats(boat_no: int, grade: str, win_rate: float, local_win: float, bi_rate: float, tri_rate: float, avg_st: float):
-    """
-    一般戦混じりの通算成績から、G1以上(記念・SG/PG1/G1)限定の推定成績を算出。
-    G1以上では全艇がA1主力級となるため、一般戦のB級相手で稼いだかさ増し分を補正し、
-    記念クラスでの実質勝率・コース別1着率/3連対率・G1平均STを計算する。
-    """
+    """一般戦混じりの通算成績から、G1以上(記念・SG/PG1/G1)限定の推定成績を算出"""
     grade_factor = 0.92 if grade == "A1" else (0.80 if grade == "A2" else 0.70)
     if win_rate >= 7.50:
         g1_win = round(max(5.20, (win_rate - 7.00) * 1.15 + 6.45) * (1.0 if grade == "A1" else 0.88), 2)
@@ -163,6 +156,29 @@ def estimate_g1_stats(boat_no: int, grade: str, win_rate: float, local_win: floa
     g1_c_tri = round(min(90.0, max(15.0, (tri_rate * 0.86) + (4 - boat_no) * 4.2)), 1)
     g1_st = round(max(0.09, min(0.22, avg_st - (0.01 if grade == "A1" else 0.0))), 2)
     return g1_win, g1_local, g1_c_win, g1_c_tri, g1_st
+
+
+def estimate_course_attack_rates(boat_no: int, win_rate: float, bi_rate: float, tri_rate: float, avg_st: float):
+    """
+    コース別の攻め方ごとの基本成功率（％）を算出：
+    ・sashiRate: 差し成功率(%)（例：2コース差し率、3〜6コース最内差し率）
+    ・makuriRate: まくり成功率(%)（例：2コースジカまくり率、3・4コースまくり率）
+    ・makurisashiRate: まくり差し成功率(%)（例：3・4・5コースまくり差し率）
+    ・waitRentaiRate: 展開待ちからの2・3着連対率(%)
+    """
+    skill = max(0.55, min(1.45, win_rate / 6.10))
+    st_boost = max(0.75, min(1.35, (0.17 - avg_st) * 8.0 + 1.0))
+
+    base_sashi = {1: 3.5, 2: 14.2, 3: 3.8, 4: 3.2, 5: 1.6, 6: 1.0}[boat_no]
+    base_makuri = {1: 68.0, 2: 5.4, 3: 8.2, 4: 7.8, 5: 2.4, 6: 1.0}[boat_no]
+    base_ms = {1: 0.5, 2: 1.2, 3: 7.2, 4: 6.4, 5: 6.8, 6: 2.6}[boat_no]
+    base_wait = {1: 18.0, 2: 46.0, 3: 44.0, 4: 45.0, 5: 42.0, 6: 31.0}[boat_no]
+
+    sashi_r = round(min(45.0, max(0.5, base_sashi * skill)), 1)
+    makuri_r = round(min(92.0 if boat_no == 1 else 38.0, max(0.5, base_makuri * skill * (1.0 if boat_no == 1 else st_boost))), 1)
+    ms_r = round(min(38.0, max(0.5, base_ms * skill * st_boost)), 1)
+    wait_r = round(min(85.0, max(12.0, base_wait * (0.65 + (tri_rate / 140.0)))), 1)
+    return sashi_r, makuri_r, ms_r, wait_r
 
 
 def fetch_race_data_from_official(hd: str, jcd: str, rno: int) -> dict:
@@ -283,6 +299,9 @@ def fetch_race_data_from_official(hd: str, jcd: str, rno: int) -> dict:
             g1_win, g1_local, g1_c_win, g1_c_tri, g1_st = estimate_g1_stats(
                 boat_no, grade, win_rate, local_win, bi_rate, tri_rate, avg_st
             )
+            sashi_r, makuri_r, ms_r, wait_r = estimate_course_attack_rates(
+                boat_no, win_rate, bi_rate, tri_rate, avg_st
+            )
 
             data["boats"][boat_key] = {
                 "id": boat_no,
@@ -300,6 +319,10 @@ def fetch_race_data_from_official(hd: str, jcd: str, rno: int) -> dict:
                 "g1CourseWin": g1_c_win,
                 "g1CourseTri": g1_c_tri,
                 "g1AvgSt": g1_st,
+                "sashiRate": sashi_r,
+                "makuriRate": makuri_r,
+                "makurisashiRate": ms_r,
+                "waitRentaiRate": wait_r,
                 "motorBi": motor_bi,
                 "motorTri": motor_tri,
                 "avgSt": avg_st,
@@ -469,7 +492,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
 
         <div class="flex flex-wrap items-center gap-1.5 text-xs">
           <button onclick="document.getElementById('factorSelectBox').classList.toggle('hidden')" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-2.5 py-1 rounded shadow">
-            ✅ 適用データ選択(18項目)
+            ✅ 適用データ選択(19項目)
           </button>
           <button onclick="document.getElementById('weightSliderBox').classList.toggle('hidden')" class="bg-sky-700 hover:bg-sky-600 text-white font-bold px-2.5 py-1 rounded shadow">
             ⚙️ 重み付け調整(0〜200%)
@@ -497,7 +520,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
     </header>
 
     <main class="max-w-7xl mx-auto px-3 pt-3 space-y-3">
-      <!-- パネルA：予想に適用するデータの選択パネル (18項目個別ON/OFF ＆ 4種プリセット) -->
+      <!-- パネルA：予想に適用するデータの選択パネル (19項目個別ON/OFF ＆ 4種プリセット) -->
       <section id="factorSelectBox" class="bg-slate-900 border-2 border-indigo-500/40 rounded-xl p-3 space-y-2">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
           <h2 class="text-xs font-bold text-indigo-300">✅ 予想計算に適用するデータの選択（チェックを外した項目は計算から除外されます）</h2>
@@ -518,9 +541,10 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="f_weight" checked onchange="runSimulation()"> 選手体重差</label>
           </div>
           <div class="bg-slate-950/70 p-2 rounded border border-slate-800 space-y-1">
-            <div class="font-bold text-emerald-400 text-[10px]">【2. コース実績・逃がし】</div>
+            <div class="font-bold text-emerald-400 text-[10px]">【2. コース実績・攻め成功率】</div>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="f_courseWin" checked onchange="runSimulation()"> コース1着率(G1対応)</label>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="f_courseTri" checked onchange="runSimulation()"> コース3連率(G1対応)</label>
+            <label class="flex items-center gap-1.5 cursor-pointer font-bold text-emerald-300"><input type="checkbox" id="f_courseKimarite" checked onchange="runSimulation()"> ⚔️コース別攻め成功率(差/捲/捲差)</label>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="f_nigashi" checked onchange="runSimulation()"> 2C逃がし率</label>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="f_nigashiTri" checked onchange="runSimulation()"> 逃がし連対率</label>
           </div>
@@ -549,13 +573,13 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           <div class="flex flex-wrap gap-1 text-[11px]">
             <button onclick="setWeightPreset(100,100,100,100)" class="bg-slate-800 hover:bg-slate-700 text-white px-2 py-0.5 rounded">標準バランス(100%)</button>
             <button onclick="setWeightPreset(80,180,140,130)" class="bg-amber-950 text-amber-300 px-2 py-0.5 rounded">展示・気配重視型</button>
-            <button onclick="setWeightPreset(180,90,110,100)" class="bg-sky-950 text-sky-300 px-2 py-0.5 rounded">コース実績重視型</button>
+            <button onclick="setWeightPreset(180,90,110,100)" class="bg-sky-950 text-sky-300 px-2 py-0.5 rounded">コース実績・決まり手重視型</button>
             <button onclick="setWeightPreset(80,150,130,190)" class="bg-rose-950 text-rose-300 px-2 py-0.5 rounded">スリット・穴展開重視型</button>
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
           <div class="bg-slate-950/70 p-2.5 rounded border border-slate-800">
-            <div class="flex justify-between mb-1"><span>① コース別実績・逃がし比重</span><span id="lbl_wCourse" class="font-mono font-bold text-sky-300">100%</span></div>
+            <div class="flex justify-between mb-1"><span>① コース別実績・攻め成功率比重</span><span id="lbl_wCourse" class="font-mono font-bold text-sky-300">100%</span></div>
             <input type="range" id="w_course" min="0" max="200" step="10" value="100" oninput="runSimulation()" class="w-full" />
           </div>
           <div class="bg-slate-950/70 p-2.5 rounded border border-slate-800">
@@ -586,7 +610,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
       </section>
 
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <!-- 左カラム (7 cols): 環境設定・進入設定・6艇カード -->
+        <!-- 左カラム (7 cols): 環境設定・進入設定・6艇カード・コース別攻め成功率マトリクス -->
         <section class="lg:col-span-7 space-y-3">
           <!-- ① 環境＆グレードフィルター -->
           <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
@@ -691,9 +715,35 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
 
           <!-- ③ 6艇カード -->
           <div class="space-y-2" id="boatCardsContainer"></div>
+
+          <!-- ④ コース別 1M攻め方＆決まり手成功率マトリクス (2Cまくり率/差し率など) -->
+          <div class="bg-slate-900 border border-emerald-500/40 rounded-xl p-3 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-1 border-b border-slate-800 pb-1.5">
+              <div>
+                <h2 class="text-xs font-bold text-emerald-400">⚔️ ④ コース別 1M攻め方 ＆ 決まり手成功率マトリクス（当日水面・風・ST補正後）</h2>
+                <span class="text-[10px] text-slate-400">2コースの「差し率・まくり率」やセンター・アウトの「まくり・まくり差し・展開待ち連対率」をコース別に算出（各艇の「詳細▼」で基礎率も変更可能）</span>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs text-left">
+                <thead class="text-[10px] text-slate-400 border-b border-slate-800">
+                  <tr>
+                    <th class="py-1">コース</th>
+                    <th class="py-1">艇・選手</th>
+                    <th class="py-1">主戦法(1Mの攻め)</th>
+                    <th class="py-1 text-right">📐差し成功率</th>
+                    <th class="py-1 text-right">🔥まくり/逃げ率</th>
+                    <th class="py-1 text-right">⚡まくり差し率</th>
+                    <th class="py-1 text-right">⏳展開待ち連対率</th>
+                  </tr>
+                </thead>
+                <tbody id="courseAttackMatrixBody" class="divide-y divide-slate-800/60"></tbody>
+              </table>
+            </div>
+          </div>
         </section>
 
-        <!-- 右カラム (5 cols): スリット図・決まり手確率・長文2パターン展開レポート・スコア・2パターン3連単＆EV・note/X出力 -->
+        <!-- 右カラム (5 cols): スリット図・決まり手確率・スコア・長文2パターン展開レポート・最大24点3連単＆EV・My予想AI採点チェッカー・note/X出力 -->
         <section class="lg:col-span-5 space-y-3">
           <!-- スリット隊形＆1M攻防矢印マップ + 決まり手確率バー -->
           <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-3">
@@ -749,33 +799,83 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             <div id="aiNarrativeBox" class="text-xs leading-relaxed text-slate-200 bg-slate-950/90 border border-slate-800 rounded-lg p-3 space-y-2.5 max-h-[420px] overflow-y-auto"></div>
           </div>
 
-          <!-- 推奨3連単＆EVチェッカー（イン逃げパターン ＆ イン逃げ以外パターン 2系統対応） -->
+          <!-- 推奨3連単＆EVチェッカー（4点〜最大24点＆自由点数指定・2パターン対応） -->
           <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2.5">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 class="text-xs font-bold text-sky-400">🎯 2パターン推奨3連単買い目（イン逃げ vs イン逃げ以外）＆ 期待値(EV)・資金配分</h2>
-                <span class="text-[10px] text-slate-400">パターン表示切替・点数・予算連動 ／ オッズ入力で回収期待値(EV)をリアルタイム判定</span>
+                <h2 class="text-xs font-bold text-sky-400">🎯 2パターン推奨3連単買い目（4点〜最大24点対応）＆ 期待値(EV)・資金配分</h2>
+                <span class="text-[10px] text-slate-400">イン逃げのみ・非インのみ選択時も指定した点数をフル出力 ／ オッズ入力でEV判定</span>
               </div>
               <div class="flex flex-wrap items-center gap-1.5 text-xs">
                 <select id="patternFilterSelect" onchange="runSimulation()" class="font-bold text-sky-300">
-                  <option value="both" selected>🔄 2パターン同時(イン逃げ＋非イン)</option>
+                  <option value="both" selected>🔄 2パターン同時(イン＋非イン)</option>
                   <option value="in_only">🟦 パターンA(イン逃げ)のみ</option>
                   <option value="non_in_only">🟥 パターンB(イン逃げ以外)のみ</option>
                 </select>
                 <select id="ticketCountSelect" onchange="runSimulation()" class="font-bold text-amber-300">
                   <option value="4">厳選 4点</option>
                   <option value="6">推奨 6点</option>
-                  <option value="8" selected>2パターン標準 8点</option>
-                  <option value="12">広め 12点</option>
+                  <option value="8">標準 8点</option>
+                  <option value="10">中穴 10点</option>
+                  <option value="12" selected>充実 12点</option>
+                  <option value="14">広め 14点</option>
+                  <option value="16">網羅 16点</option>
+                  <option value="18">多点 18点</option>
+                  <option value="20">フォーメーション 20点</option>
+                  <option value="24">フルカバー 24点</option>
                 </select>
-                <input type="number" id="budgetInput" value="4000" step="100" min="400" onchange="runSimulation()" class="w-16 text-right font-mono text-amber-300" title="総軍資金(円)" />
+                <input type="number" id="budgetInput" value="5000" step="100" min="400" onchange="runSimulation()" class="w-16 text-right font-mono text-amber-300" title="総軍資金(円)" />
                 <button onclick="copyBetsList()" class="bg-sky-600 hover:bg-sky-500 text-white font-bold px-2 py-1 rounded text-[11px]">買い目コピー</button>
               </div>
             </div>
             <div id="copyBetsToast" class="hidden text-[11px] text-emerald-300 bg-emerald-950/70 border border-emerald-700/50 rounded px-2 py-1">
               推奨買い目と配分金額をコピーしました！
             </div>
-            <div id="recommendationsContainer" class="space-y-2"></div>
+            <div id="recommendationsContainer" class="space-y-2 max-h-[460px] overflow-y-auto pr-1"></div>
+          </div>
+
+          <!-- 🧐 新機能：自分の予想を入力してAIが採点・スジ評価するチェッカー -->
+          <div class="bg-slate-900 border-2 border-pink-500/50 rounded-xl p-3 space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
+              <div>
+                <h2 class="text-xs font-bold text-pink-300">🧐 あなたの予想・買い目 AI採点＆スジ評価チェッカー（My予想ジャッジ）</h2>
+                <span class="text-[10px] text-slate-400">自分の買い目（単発 `1-2-3` やフォーメーション `1-23-2345`、`3-4-全`）を入力すると、100点満点スコア・スジ整合性・抜け目（死角）を診断します</span>
+              </div>
+              <div class="flex gap-1 text-[11px]">
+                <button onclick="loadAiBetsToUserInput()" class="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-600/40 px-2 py-0.5 rounded">🔄 AI上位目を入力</button>
+                <button onclick="clearUserBetsInput()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded">クリア</button>
+              </div>
+            </div>
+
+            <!-- クイックフォーメーション追加＆テキスト入力 -->
+            <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-2 space-y-2 text-xs">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[11px] text-slate-300 font-bold">あなたの想定展開:</span>
+                  <select id="userScenarioSelect" onchange="evaluateUserPredictions()" class="text-[11px] font-bold text-pink-200">
+                    <option value="auto" selected>🤖 買い目から自動逆算</option>
+                    <option value="in_nige">🛡️ 1コース逃げ本線</option>
+                    <option value="c2_sashi">📐 2コース差し逆転</option>
+                    <option value="c2_makuri">🔥 2コースまくり(ジカまくり)</option>
+                    <option value="c3_attack">⚡ 3コースまくり/まくり差し</option>
+                    <option value="c4_kado">🔥 4カドまくり/まくり差し</option>
+                    <option value="out_wait">⏳ 5・6コース展開待ち高配当</option>
+                  </select>
+                </div>
+                <div class="flex flex-wrap gap-1 text-[10px]">
+                  <button onclick="addPresetUserFormation('1-23-2345')" class="bg-slate-800 hover:bg-slate-700 text-sky-300 px-1.5 py-0.5 rounded">例: 1-23-2345</button>
+                  <button onclick="addPresetUserFormation('2-1-345, 3-14-145')" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-1.5 py-0.5 rounded">例: 2差＆3攻め</button>
+                  <button onclick="addPresetUserFormation('4-51-1256')" class="bg-slate-800 hover:bg-slate-700 text-rose-300 px-1.5 py-0.5 rounded">例: 4カド連動</button>
+                </div>
+              </div>
+
+              <div>
+                <textarea id="userBetsInput" rows="2" oninput="evaluateUserPredictions()" placeholder="例: 1-2-3, 1-2-4, 3-4-5 またはフォーメーション表記 1-23-2345 / 3-4-全 (改行・カンマ・スペース区切り対応)" class="w-full bg-slate-900 border border-pink-500/40 rounded p-2 text-xs font-mono text-white focus:outline-none">1-2-4, 1-4-2, 3-4-5, 3-4-1</textarea>
+              </div>
+            </div>
+
+            <!-- 評価結果表示ボックス -->
+            <div id="userEvalResultBox" class="space-y-2"></div>
           </div>
 
           <!-- 💰 収益化・note有料記事 / X集客ポスト そのままコピペ用レポート -->
@@ -844,6 +944,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
       let boatsData = {};
       let allDetailsOpen = false;
       let latestReportParts = { free: "", paid: "", full: "" };
+      let latestSimContext = null;
 
       function isG1ModeActive() {
         const grade = document.getElementById("raceGradeSelect")?.value || "ippan";
@@ -869,7 +970,31 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         const g1CWin = Math.round(Math.min(88.0, Math.max(1.5, (map1st[id] || 10) * ratio)) * 10) / 10;
         const g1CTri = Math.round(Math.min(90.0, Math.max(15.0, triRate * 0.86 + (4 - id) * 4.2)) * 10) / 10;
         const g1St = Math.round(Math.max(0.09, Math.min(0.22, avgSt - (grade === "A1" ? 0.01 : 0.0))) * 100) / 100;
-        return { g1WinRate: g1Win, g1LocalWin: g1Local, g1CourseWin: g1CWin, g1CourseTri: g1CTri, g1AvgSt: g1St };
+
+        // コース別攻め方成功率（差し率・まくり率・まくり差し率・展開待ち連対率）
+        const skill = Math.max(0.55, Math.min(1.45, winRate / 6.1));
+        const stBoost = Math.max(0.75, Math.min(1.35, (0.17 - avgSt) * 8.0 + 1.0));
+        const baseSashi = { 1: 3.5, 2: 14.2, 3: 3.8, 4: 3.2, 5: 1.6, 6: 1.0 }[id] || 3.0;
+        const baseMakuri = { 1: 68.0, 2: 5.4, 3: 8.2, 4: 7.8, 5: 2.4, 6: 1.0 }[id] || 4.0;
+        const baseMs = { 1: 0.5, 2: 1.2, 3: 7.2, 4: 6.4, 5: 6.8, 6: 2.6 }[id] || 3.0;
+        const baseWait = { 1: 18.0, 2: 46.0, 3: 44.0, 4: 45.0, 5: 42.0, 6: 31.0 }[id] || 35.0;
+
+        const sashiRate = Math.round(Math.min(45.0, Math.max(0.5, baseSashi * skill)) * 10) / 10;
+        const makuriRate = Math.round(Math.min(id === 1 ? 92.0 : 38.0, Math.max(0.5, baseMakuri * skill * (id === 1 ? 1.0 : stBoost))) * 10) / 10;
+        const makurisashiRate = Math.round(Math.min(38.0, Math.max(0.5, baseMs * skill * stBoost)) * 10) / 10;
+        const waitRentaiRate = Math.round(Math.min(85.0, Math.max(12.0, baseWait * (0.65 + triRate / 140.0))) * 10) / 10;
+
+        return {
+          g1WinRate: g1Win,
+          g1LocalWin: g1Local,
+          g1CourseWin: g1CWin,
+          g1CourseTri: g1CTri,
+          g1AvgSt: g1St,
+          sashiRate: b.sashiRate ?? sashiRate,
+          makuriRate: b.makuriRate ?? makuriRate,
+          makurisashiRate: b.makurisashiRate ?? makurisashiRate,
+          waitRentaiRate: b.waitRentaiRate ?? waitRentaiRate
+        };
       }
 
       function getActiveFactors() {
@@ -882,6 +1007,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           weight: chk("f_weight"),
           courseWin: chk("f_courseWin"),
           courseTri: chk("f_courseTri"),
+          courseKimarite: chk("f_courseKimarite"),
           nigashi: chk("f_nigashi"),
           nigashiTri: chk("f_nigashiTri"),
           motorBi: chk("f_motorBi"),
@@ -919,7 +1045,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
       function setFactorPreset(mode) {
         const ids = [
           "f_winRate", "f_localWin", "f_g1OnlyRule", "f_seriesScore", "f_weight",
-          "f_courseWin", "f_courseTri", "f_nigashi", "f_nigashiTri",
+          "f_courseWin", "f_courseTri", "f_courseKimarite", "f_nigashi", "f_nigashiTri",
           "f_motorBi", "f_exTimeRank", "f_oriTimeRank", "f_vis", "f_partsTilt",
           "f_avgSt", "f_seriesSt", "f_fCount", "f_env"
         ];
@@ -928,7 +1054,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           if (!el) return;
           if (mode === "all") el.checked = true;
           else if (mode === "chokuzen") {
-            el.checked = ["f_exTimeRank", "f_oriTimeRank", "f_vis", "f_partsTilt", "f_seriesSt", "f_env", "f_courseWin", "f_g1OnlyRule"].includes(id);
+            el.checked = ["f_exTimeRank", "f_oriTimeRank", "f_vis", "f_partsTilt", "f_seriesSt", "f_env", "f_courseWin", "f_courseKimarite", "f_g1OnlyRule"].includes(id);
           } else if (mode === "jizen") {
             el.checked = !["f_exTimeRank", "f_oriTimeRank", "f_vis"].includes(id);
           } else if (mode === "nomotor") {
@@ -975,12 +1101,12 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         document.getElementById("tideLevel").value = "low";
 
         boatsData = {
-          1: { id: 1, name: "白井 英治", grade: "A1", fCount: 0, weight: 52.0, winRate: 8.12, biRate: 64.5, triRate: 78.0, localWin: 8.35, g1WinRate: 7.72, g1LocalWin: 7.90, g1CourseWin: 76.5, g1CourseTri: 88.0, g1AvgSt: 0.11, motorBi: 46.2, motorTri: 63.5, avgSt: 0.12, seriesSt: 0.11, seriesScore: 92, courseWin: 82.0, courseTri: 91.0, nigashi: 0, nigashiTri: 0, parts: "none", tilt: -0.5, exTime: 6.75, exTimeRank: 2, oriTimeRank: 1, visSlit: 1, visTurn: 2, manualTactic: "auto" },
-          2: { id: 2, name: "瓜生 正義", grade: "A1", fCount: 0, weight: 52.0, winRate: 7.58, biRate: 56.0, triRate: 72.0, localWin: 7.8, g1WinRate: 7.12, g1LocalWin: 7.28, g1CourseWin: 19.5, g1CourseTri: 64.5, g1AvgSt: 0.13, motorBi: 41.0, motorTri: 58.0, avgSt: 0.14, seriesSt: 0.14, seriesScore: 84, courseWin: 22.0, courseTri: 68.0, nigashi: 62.5, nigashiTri: 64.0, parts: "none", tilt: -0.5, exTime: 6.79, exTimeRank: 3, oriTimeRank: 2, visSlit: 0, visTurn: 1, manualTactic: "auto" },
-          3: { id: 3, name: "澤田 尚也", grade: "A1", fCount: 1, weight: 52.0, winRate: 7.15, biRate: 53.0, triRate: 70.5, localWin: 7.1, g1WinRate: 6.45, g1LocalWin: 6.40, g1CourseWin: 20.0, g1CourseTri: 60.0, g1AvgSt: 0.13, motorBi: 44.5, motorTri: 61.0, avgSt: 0.13, seriesSt: 0.13, seriesScore: 82, courseWin: 24.0, courseTri: 65.0, nigashi: 0, nigashiTri: 58.0, parts: "none", tilt: 0.0, exTime: 6.71, exTimeRank: 1, oriTimeRank: 3, visSlit: 2, visTurn: 0, manualTactic: "auto" },
-          4: { id: 4, name: "大峯 豊", grade: "A1", fCount: 0, weight: 52.0, winRate: 7.24, biRate: 55.2, triRate: 73.0, localWin: 7.45, g1WinRate: 6.68, g1LocalWin: 6.84, g1CourseWin: 17.5, g1CourseTri: 70.0, g1AvgSt: 0.13, motorBi: 48.0, motorTri: 66.0, avgSt: 0.14, seriesSt: 0.13, seriesScore: 89, courseWin: 19.5, courseTri: 74.0, nigashi: 0, nigashiTri: 79.2, parts: "ring", tilt: -0.5, exTime: 6.75, exTimeRank: 2, oriTimeRank: 1, visSlit: 1, visTurn: 2, manualTactic: "auto" },
-          5: { id: 5, name: "篠崎 仁志", grade: "A1", fCount: 0, weight: 52.0, winRate: 7.4, biRate: 54.0, triRate: 69.0, localWin: 7.3, g1WinRate: 6.90, g1LocalWin: 6.82, g1CourseWin: 10.5, g1CourseTri: 55.0, g1AvgSt: 0.13, motorBi: 39.5, motorTri: 55.0, avgSt: 0.14, seriesSt: 0.15, seriesScore: 78, courseWin: 12.0, courseTri: 58.0, nigashi: 0, nigashiTri: 56.0, parts: "none", tilt: -0.5, exTime: 6.80, exTimeRank: 3, oriTimeRank: 3, visSlit: 0, visTurn: 1, manualTactic: "auto" },
-          6: { id: 6, name: "吉田 裕平", grade: "A1", fCount: 0, weight: 52.0, winRate: 7.05, biRate: 51.5, triRate: 67.0, localWin: 6.95, g1WinRate: 6.32, g1LocalWin: 6.24, g1CourseWin: 5.0, g1CourseTri: 42.0, g1AvgSt: 0.13, motorBi: 38.0, motorTri: 54.0, avgSt: 0.13, seriesSt: 0.14, seriesScore: 76, courseWin: 6.0, courseTri: 46.0, nigashi: 0, nigashiTri: 45.0, parts: "none", tilt: -0.5, exTime: 6.82, exTimeRank: 3, oriTimeRank: 3, visSlit: 0, visTurn: 0, manualTactic: "auto" }
+          1: { id: 1, name: "白井 英治", grade: "A1", fCount: 0, weight: 52.0, winRate: 8.12, biRate: 64.5, triRate: 78.0, localWin: 8.35, g1WinRate: 7.72, g1LocalWin: 7.90, g1CourseWin: 76.5, g1CourseTri: 88.0, g1AvgSt: 0.11, sashiRate: 4.0, makuriRate: 76.5, makurisashiRate: 1.0, waitRentaiRate: 25.0, motorBi: 46.2, motorTri: 63.5, avgSt: 0.12, seriesSt: 0.11, seriesScore: 92, courseWin: 82.0, courseTri: 91.0, nigashi: 0, nigashiTri: 0, parts: "none", tilt: -0.5, exTime: 6.75, exTimeRank: 2, oriTimeRank: 1, visSlit: 1, visTurn: 2, manualTactic: "auto" },
+          2: { id: 2, name: "瓜生 正義", grade: "A1", fCount: 0, weight: 52.0, winRate: 7.58, biRate: 56.0, triRate: 72.0, localWin: 7.8, g1WinRate: 7.12, g1LocalWin: 7.28, g1CourseWin: 19.5, g1CourseTri: 64.5, g1AvgSt: 0.13, sashiRate: 16.8, makuriRate: 6.2, makurisashiRate: 1.5, waitRentaiRate: 54.0, motorBi: 41.0, motorTri: 58.0, avgSt: 0.14, seriesSt: 0.14, seriesScore: 84, courseWin: 22.0, courseTri: 68.0, nigashi: 62.5, nigashiTri: 64.0, parts: "none", tilt: -0.5, exTime: 6.79, exTimeRank: 3, oriTimeRank: 2, visSlit: 0, visTurn: 1, manualTactic: "auto" },
+          3: { id: 3, name: "澤田 尚也", grade: "A1", fCount: 1, weight: 52.0, winRate: 7.15, biRate: 53.0, triRate: 70.5, localWin: 7.1, g1WinRate: 6.45, g1LocalWin: 6.40, g1CourseWin: 20.0, g1CourseTri: 60.0, g1AvgSt: 0.13, sashiRate: 4.2, makuriRate: 13.5, makurisashiRate: 9.8, waitRentaiRate: 48.0, motorBi: 44.5, motorTri: 61.0, avgSt: 0.13, seriesSt: 0.13, seriesScore: 82, courseWin: 24.0, courseTri: 65.0, nigashi: 0, nigashiTri: 58.0, parts: "none", tilt: 0.0, exTime: 6.71, exTimeRank: 1, oriTimeRank: 3, visSlit: 2, visTurn: 0, manualTactic: "auto" },
+          4: { id: 4, name: "大峯 豊", grade: "A1", fCount: 0, weight: 52.0, winRate: 7.24, biRate: 55.2, triRate: 73.0, localWin: 7.45, g1WinRate: 6.68, g1LocalWin: 6.84, g1CourseWin: 17.5, g1CourseTri: 70.0, g1AvgSt: 0.13, sashiRate: 5.5, makuriRate: 9.2, makurisashiRate: 11.4, waitRentaiRate: 58.0, motorBi: 48.0, motorTri: 66.0, avgSt: 0.14, seriesSt: 0.13, seriesScore: 89, courseWin: 19.5, courseTri: 74.0, nigashi: 0, nigashiTri: 79.2, parts: "ring", tilt: -0.5, exTime: 6.75, exTimeRank: 2, oriTimeRank: 1, visSlit: 1, visTurn: 2, manualTactic: "auto" },
+          5: { id: 5, name: "篠崎 仁志", grade: "A1", fCount: 0, weight: 52.0, winRate: 7.4, biRate: 54.0, triRate: 69.0, localWin: 7.3, g1WinRate: 6.90, g1LocalWin: 6.82, g1CourseWin: 10.5, g1CourseTri: 55.0, g1AvgSt: 0.13, sashiRate: 2.8, makuriRate: 3.2, makurisashiRate: 8.6, waitRentaiRate: 52.0, motorBi: 39.5, motorTri: 55.0, avgSt: 0.14, seriesSt: 0.15, seriesScore: 78, courseWin: 12.0, courseTri: 58.0, nigashi: 0, nigashiTri: 56.0, parts: "none", tilt: -0.5, exTime: 6.80, exTimeRank: 3, oriTimeRank: 3, visSlit: 0, visTurn: 1, manualTactic: "auto" },
+          6: { id: 6, name: "吉田 裕平", grade: "A1", fCount: 0, weight: 52.0, winRate: 7.05, biRate: 51.5, triRate: 67.0, localWin: 6.95, g1WinRate: 6.32, g1LocalWin: 6.24, g1CourseWin: 5.0, g1CourseTri: 42.0, g1AvgSt: 0.13, sashiRate: 1.8, makuriRate: 1.2, makurisashiRate: 3.4, waitRentaiRate: 41.0, motorBi: 38.0, motorTri: 54.0, avgSt: 0.13, seriesSt: 0.14, seriesScore: 76, courseWin: 6.0, courseTri: 46.0, nigashi: 0, nigashiTri: 45.0, parts: "none", tilt: -0.5, exTime: 6.82, exTimeRank: 3, oriTimeRank: 3, visSlit: 0, visTurn: 0, manualTactic: "auto" }
         };
 
         setCoursePreset([1, 2, 3, 4, 5, 6], 3, "normal");
@@ -1084,11 +1210,17 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           const exRankLabel = d.exTimeRank === 1 ? "🥇展1位" : d.exTimeRank === 2 ? "🥈展2位" : d.exTimeRank === 5 ? "展劣" : "展中";
           const exBadgeCls = d.exTimeRank === 1 ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold" : "bg-slate-800 text-slate-300";
           const activeWinDisp = g1Active ? `🏆G1勝率 ${(d.g1WinRate || 6.0).toFixed(2)}` : `全国 ${(d.winRate || 5.5).toFixed(2)}`;
+          const attackSummary = b === 1
+            ? `逃${(d.makuriRate || d.courseWin || 70).toFixed(0)}%`
+            : b === 2
+              ? `差${(d.sashiRate || 14).toFixed(1)}% / 捲${(d.makuriRate || 5).toFixed(1)}%`
+              : `捲${(d.makuriRate || 7).toFixed(1)}% / 捲差${(d.makurisashiRate || 6).toFixed(1)}% / 差${(d.sashiRate || 3).toFixed(1)}%`;
+
           const card = document.createElement("div");
           card.className = "bg-slate-900 border border-slate-800 rounded-xl overflow-hidden";
           card.innerHTML = `
           <div class="p-2.5 flex flex-wrap items-center justify-between gap-2">
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 flex-wrap">
               <span class="boat-${b} w-6 h-6 rounded font-black text-xs flex items-center justify-center">${b}</span>
               <input type="text" value="${d.name}" onchange="updateBoat(${b},'name',this.value)" class="bg-slate-950 px-1.5 py-0.5 rounded border border-slate-700 font-bold text-xs text-white w-28 focus:outline-none" />
               <select onchange="updateBoat(${b},'grade',this.value)" class="text-[11px] font-bold">
@@ -1099,6 +1231,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
                 <option value="0" ${d.fCount === 0 ? "selected" : ""}>F0</option><option value="1" ${d.fCount === 1 ? "selected" : ""}>F1</option><option value="2" ${d.fCount === 2 ? "selected" : ""}>F2</option>
               </select>
               <span class="text-[10px] font-mono px-1.5 py-0.5 rounded ${g1Active ? "bg-amber-950 text-amber-300 border border-amber-600/40 font-bold" : "bg-slate-800 text-sky-300"}">${activeWinDisp}</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-700/40">${attackSummary}</span>
               <span class="text-[10px] font-mono px-1.5 py-0.5 rounded ${exBadgeCls}">${(d.exTime || 6.80).toFixed(2)}s (${exRankLabel})</span>
             </div>
             <div class="flex flex-wrap items-center gap-1 text-[11px]">
@@ -1126,19 +1259,29 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
               <button onclick="document.getElementById('detail_${b}').classList.toggle('hidden')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded">詳細▼</button>
             </div>
           </div>
-          <div id="detail_${b}" class="${expandedDetails.has(`detail_${b}`) || allDetailsOpen ? "" : "hidden"} border-t border-slate-800 bg-slate-950/60 p-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+          <div id="detail_${b}" class="${expandedDetails.has(`detail_${b}`) || allDetailsOpen ? "" : "hidden"} border-t border-slate-800 bg-slate-950/60 p-2.5 grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px]">
             <div><span class="text-slate-400 block">通算 全国勝率 / 当地勝率</span><div class="flex gap-1 mt-0.5"><input type="number" step="0.01" value="${d.winRate}" onchange="updateBoat(${b},'winRate',parseFloat(this.value))" class="w-1/2"/><input type="number" step="0.01" value="${d.localWin}" onchange="updateBoat(${b},'localWin',parseFloat(this.value))" class="w-1/2"/></div></div>
             <div class="bg-amber-950/30 p-1 rounded border border-amber-600/30"><span class="text-amber-300 font-bold block">🏆G1限定 勝率 / 当地</span><div class="flex gap-1 mt-0.5"><input type="number" step="0.01" value="${d.g1WinRate || 6.0}" onchange="updateBoat(${b},'g1WinRate',parseFloat(this.value))" class="w-1/2 text-amber-200 font-bold"/><input type="number" step="0.01" value="${d.g1LocalWin || 6.0}" onchange="updateBoat(${b},'g1LocalWin',parseFloat(this.value))" class="w-1/2 text-amber-200 font-bold"/></div></div>
             <div><span class="text-slate-400 block">通算 コース1着/3連率(%)</span><div class="flex gap-1 mt-0.5"><input type="number" step="0.1" value="${d.courseWin}" onchange="updateBoat(${b},'courseWin',parseFloat(this.value))" class="w-1/2"/><input type="number" step="0.1" value="${d.courseTri}" onchange="updateBoat(${b},'courseTri',parseFloat(this.value))" class="w-1/2"/></div></div>
             <div class="bg-amber-950/30 p-1 rounded border border-amber-600/30"><span class="text-amber-300 font-bold block">🏆G1コース1着/3連率(%)</span><div class="flex gap-1 mt-0.5"><input type="number" step="0.1" value="${d.g1CourseWin || d.courseWin}" onchange="updateBoat(${b},'g1CourseWin',parseFloat(this.value))" class="w-1/2 text-amber-200 font-bold"/><input type="number" step="0.1" value="${d.g1CourseTri || d.courseTri}" onchange="updateBoat(${b},'g1CourseTri',parseFloat(this.value))" class="w-1/2 text-amber-200 font-bold"/></div></div>
+            <div class="bg-emerald-950/30 p-1 rounded border border-emerald-600/30 col-span-2 sm:col-span-2">
+              <span class="text-emerald-300 font-bold block">⚔️ コース別 攻め成功率(%) [📐差し率 / 🔥まくり率 / ⚡まくり差し率 / ⏳展開待ち連対率]</span>
+              <div class="grid grid-cols-4 gap-1 mt-0.5">
+                <input type="number" step="0.1" value="${d.sashiRate ?? 10.0}" onchange="updateBoat(${b},'sashiRate',parseFloat(this.value))" class="text-emerald-200 font-bold" title="差し率(%)" />
+                <input type="number" step="0.1" value="${d.makuriRate ?? 8.0}" onchange="updateBoat(${b},'makuriRate',parseFloat(this.value))" class="text-rose-200 font-bold" title="まくり率(%)" />
+                <input type="number" step="0.1" value="${d.makurisashiRate ?? 6.0}" onchange="updateBoat(${b},'makurisashiRate',parseFloat(this.value))" class="text-amber-200 font-bold" title="まくり差し率(%)" />
+                <input type="number" step="0.1" value="${d.waitRentaiRate ?? 45.0}" onchange="updateBoat(${b},'waitRentaiRate',parseFloat(this.value))" class="text-purple-200 font-bold" title="展開待ち連対率(%)" />
+              </div>
+            </div>
             <div><span class="text-slate-400 block">モーター2連/3連(%)</span><div class="flex gap-1 mt-0.5"><input type="number" step="0.1" value="${d.motorBi}" onchange="updateBoat(${b},'motorBi',parseFloat(this.value))" class="w-1/2"/><input type="number" step="0.1" value="${d.motorTri}" onchange="updateBoat(${b},'motorTri',parseFloat(this.value))" class="w-1/2"/></div></div>
             <div><span class="text-slate-400 block">通算ST / G1限定ST / 展ST</span><div class="flex gap-1 mt-0.5"><input type="number" step="0.01" value="${d.avgSt}" onchange="updateBoat(${b},'avgSt',parseFloat(this.value))" class="w-1/3" title="通算ST"/><input type="number" step="0.01" value="${d.g1AvgSt || d.avgSt}" onchange="updateBoat(${b},'g1AvgSt',parseFloat(this.value))" class="w-1/3 text-amber-200 font-bold" title="G1限定ST"/><input type="number" step="0.01" value="${d.seriesSt}" onchange="updateBoat(${b},'seriesSt',parseFloat(this.value))" class="w-1/3" title="今節/展示ST"/></div></div>
-            <div><span class="text-slate-400 block">節間点(30-100)/体重/逃がし</span><div class="flex gap-1 mt-0.5"><input type="number" value="${d.seriesScore}" onchange="updateBoat(${b},'seriesScore',parseFloat(this.value))" class="w-1/3"/><input type="number" step="0.5" value="${d.weight}" onchange="updateBoat(${b},'weight',parseFloat(this.value))" class="w-1/3"/><input type="number" step="0.1" value="${d.nigashi}" onchange="updateBoat(${b},'nigashi',parseFloat(this.value))" class="w-1/3" title="2C逃がし率"/></div></div>
-            <div><span class="text-slate-400 block">展示時計(秒)/順位/オリ展/伸/部品</span><div class="flex gap-1 mt-0.5">
-              <input type="number" step="0.01" value="${(d.exTime || 6.80).toFixed(2)}" onchange="updateBoat(${b},'exTime',parseFloat(this.value))" class="w-1/4 font-mono text-amber-300" />
-              <select onchange="updateBoat(${b},'exTimeRank',Number(this.value))" class="w-1/4"><option value="1" ${d.exTimeRank === 1 ? "selected" : ""}>展1位</option><option value="2" ${d.exTimeRank === 2 ? "selected" : ""}>展2位</option><option value="3" ${d.exTimeRank === 3 ? "selected" : ""}>展普</option><option value="5" ${d.exTimeRank === 5 ? "selected" : ""}>展劣</option></select>
-              <select onchange="updateBoat(${b},'oriTimeRank',Number(this.value))" class="w-1/4"><option value="0" ${d.oriTimeRank === 0 ? "selected" : ""}>オ未</option><option value="1" ${d.oriTimeRank === 1 ? "selected" : ""}>オ1位</option><option value="2" ${d.oriTimeRank === 2 ? "selected" : ""}>オ上</option><option value="3" ${d.oriTimeRank === 3 ? "selected" : ""}>オ普</option><option value="5" ${d.oriTimeRank === 5 ? "selected" : ""}>オ劣</option></select>
-              <select onchange="updateBoat(${b},'parts',this.value)" class="w-1/4"><option value="none" ${d.parts === "none" ? "selected" : ""}>部品無</option><option value="ring" ${d.parts === "ring" ? "selected" : ""}>リング◎</option><option value="elec" ${d.parts === "elec" ? "selected" : ""}>電気</option><option value="body" ${d.parts === "body" ? "selected" : ""}>ボデー</option><option value="shaft" ${d.parts === "shaft" ? "selected" : ""}>シャフト×</option></select>
+            <div><span class="text-slate-400 block">節間点/体重/2C逃がし率</span><div class="flex gap-1 mt-0.5"><input type="number" value="${d.seriesScore}" onchange="updateBoat(${b},'seriesScore',parseFloat(this.value))" class="w-1/3"/><input type="number" step="0.5" value="${d.weight}" onchange="updateBoat(${b},'weight',parseFloat(this.value))" class="w-1/3"/><input type="number" step="0.1" value="${d.nigashi}" onchange="updateBoat(${b},'nigashi',parseFloat(this.value))" class="w-1/3" title="2C逃がし率"/></div></div>
+            <div class="col-span-2 sm:col-span-3"><span class="text-slate-400 block">展示時計(秒) / 展示順位 / オリ展順位 / スリット伸気配 / 部品交換</span><div class="grid grid-cols-5 gap-1 mt-0.5">
+              <input type="number" step="0.01" value="${(d.exTime || 6.80).toFixed(2)}" onchange="updateBoat(${b},'exTime',parseFloat(this.value))" class="font-mono text-amber-300" />
+              <select onchange="updateBoat(${b},'exTimeRank',Number(this.value))"><option value="1" ${d.exTimeRank === 1 ? "selected" : ""}>展1位</option><option value="2" ${d.exTimeRank === 2 ? "selected" : ""}>展2位</option><option value="3" ${d.exTimeRank === 3 ? "selected" : ""}>展普</option><option value="5" ${d.exTimeRank === 5 ? "selected" : ""}>展劣</option></select>
+              <select onchange="updateBoat(${b},'oriTimeRank',Number(this.value))"><option value="0" ${d.oriTimeRank === 0 ? "selected" : ""}>オ未</option><option value="1" ${d.oriTimeRank === 1 ? "selected" : ""}>オ1位</option><option value="2" ${d.oriTimeRank === 2 ? "selected" : ""}>オ上</option><option value="3" ${d.oriTimeRank === 3 ? "selected" : ""}>オ普</option><option value="5" ${d.oriTimeRank === 5 ? "selected" : ""}>オ劣</option></select>
+              <select onchange="updateBoat(${b},'visSlit',Number(this.value))"><option value="2" ${d.visSlit === 2 ? "selected" : ""}>★伸◎</option><option value="1" ${d.visSlit === 1 ? "selected" : ""}>◎良</option><option value="0" ${d.visSlit === 0 ? "selected" : ""}>□普</option><option value="-1" ${d.visSlit === -1 ? "selected" : ""}>▲劣</option></select>
+              <select onchange="updateBoat(${b},'parts',this.value)"><option value="none" ${d.parts === "none" ? "selected" : ""}>部品無</option><option value="ring" ${d.parts === "ring" ? "selected" : ""}>リング◎</option><option value="elec" ${d.parts === "elec" ? "selected" : ""}>電気</option><option value="body" ${d.parts === "body" ? "selected" : ""}>ボデー</option><option value="shaft" ${d.parts === "shaft" ? "selected" : ""}>シャフト×</option></select>
             </div></div>
           </div>`;
           container.appendChild(card);
@@ -1148,7 +1291,9 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
       function updateBoat(b, key, val) {
         boatsData[b][key] = val;
         if (key === "exTime") recalculateExRanksFromTime();
-        if (["manualTactic", "exTime", "exTimeRank", "g1WinRate", "winRate", "grade"].includes(key)) renderBoatCards();
+        if (["manualTactic", "exTime", "exTimeRank", "g1WinRate", "winRate", "grade", "sashiRate", "makuriRate", "makurisashiRate"].includes(key)) {
+          renderBoatCards();
+        }
         runSimulation();
       }
 
@@ -1197,6 +1342,10 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         for (let c = 1; c <= 6; c++) {
           courseOrder.push(Number(document.getElementById(`course_${c}`).value));
         }
+
+        const vInMod = af.env ? venue.inMod : 0;
+        const vMakuriMod = af.env ? venue.makuriMod : 0;
+        const vSashiMod = af.env ? venue.sashiMod : 0;
 
         const courseEval = {};
         courseOrder.forEach((boatId, idx) => {
@@ -1258,8 +1407,27 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             slitPower += isDash ? windSpeed * 1.6 : -windSpeed * 1.2;
           }
 
-          const cWinBonus = af.courseWin ? (effCourseWin * 0.45 * cw.wc) : ([65, 18, 15, 13, 7, 3][courseNo - 1] * 0.45);
-          const cTriBonus = af.courseTri ? (effCourseTri * 0.55 * cw.wc) : ([75, 55, 52, 48, 38, 25][courseNo - 1] * 0.55);
+          // 当日のコース環境補正を加味した「コース別攻め成功率(%)」の算出
+          const envSashiAdj = (windDir === "tail" ? windSpeed * 0.8 : 0) + (tide === "high" ? 1.5 : 0) + vSashiMod * 0.4 + (b.visTurn * 1.5);
+          const envMakuriAdj = (windDir === "head" ? windSpeed * 0.9 : 0) + (tide === "low" ? 1.8 : 0) + vMakuriMod * 0.45 + (isKado ? 3.5 : 0) + (b.visSlit * 1.8);
+          const envMsAdj = (isKado ? 2.5 : 0) + (b.visTurn * 1.4) + (b.visSlit * 1.2) + vSashiMod * 0.3;
+
+          const effSashiRate = Math.max(0.5, Math.min(55.0, (b.sashiRate ?? 10.0) + envSashiAdj));
+          const effMakuriRate = courseNo === 1
+            ? Math.max(25.0, Math.min(92.0, effCourseWin + vInMod - (deepIn === "deep" ? 12 : deepIn === "semi" ? 5 : 0)))
+            : Math.max(0.5, Math.min(48.0, (b.makuriRate ?? 6.0) + envMakuriAdj));
+          const effMsRate = Math.max(0.5, Math.min(45.0, (b.makurisashiRate ?? 5.0) + envMsAdj));
+          const effWaitRate = Math.max(10.0, Math.min(88.0, (b.waitRentaiRate ?? 42.0) + (b.visTurn * 3.5)));
+
+          const kimariteFirstBonus = af.courseKimarite
+            ? (courseNo === 1 ? effMakuriRate * 0.18 : (effSashiRate * 0.42 + effMakuriRate * 0.52 + effMsRate * 0.48)) * cw.wc
+            : 0;
+          const kimaritePlaceBonus = af.courseKimarite
+            ? (effWaitRate * 0.25 + effSashiRate * 0.22 + effMsRate * 0.25) * cw.wc
+            : 0;
+
+          const cWinBonus = af.courseWin ? (effCourseWin * 0.40 * cw.wc) : ([65, 18, 15, 13, 7, 3][courseNo - 1] * 0.40);
+          const cTriBonus = af.courseTri ? (effCourseTri * 0.50 * cw.wc) : ([75, 55, 52, 48, 38, 25][courseNo - 1] * 0.50);
 
           courseEval[courseNo] = {
             courseNo,
@@ -1270,20 +1438,20 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             effCourseWin,
             effCourseTri,
             effAvgSt,
+            effSashiRate,
+            effMakuriRate,
+            effMsRate,
+            effWaitRate,
             isDash,
             isKado,
             expectedSt: Math.max(0.04, Math.min(0.28, baseSt)),
             slitPower,
-            firstScore: blendedPower + weightBonus + partsBonus + totalExBonus + cWinBonus,
-            placeScore: blendedPower + weightBonus + partsBonus + totalExBonus + cTriBonus + (af.vis ? b.visTurn * 5 * cw.we : 0),
+            firstScore: blendedPower + weightBonus + partsBonus + totalExBonus + cWinBonus + kimariteFirstBonus,
+            placeScore: blendedPower + weightBonus + partsBonus + totalExBonus + cTriBonus + kimaritePlaceBonus + (af.vis ? b.visTurn * 5 * cw.we : 0),
             roleText: "標準",
             attackType: "auto"
           };
         });
-
-        const vInMod = af.env ? venue.inMod : 0;
-        const vMakuriMod = af.env ? venue.makuriMod : 0;
-        const vSashiMod = af.env ? venue.sashiMod : 0;
 
         courseEval[1].firstScore += (g1Active ? 23 : 28) + vInMod;
         if (af.fCount) {
@@ -1304,16 +1472,37 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           courseEval[1].firstScore += (c2Boat.nigashi - 52.0) * 0.45 * cw.wc - (af.fCount ? c2Boat.fCount * 9 : 0);
         }
 
+        // 2コースのジカまくり vs 差し判定（2コースまくり率が高い、または1Cよりスリット優勢時）
+        if (courseEval[2].b.manualTactic === "auto") {
+          if (courseEval[2].effMakuriRate >= courseEval[2].effSashiRate + 2.0 || (courseEval[2].slitPower - courseEval[1].slitPower >= 10 && courseEval[2].effMakuriRate >= 8.0)) {
+            courseEval[2].firstScore += (12 + vMakuriMod) * cw.ws;
+            courseEval[2].roleText = `🔥2Cまくり(${courseEval[2].effMakuriRate.toFixed(1)}%)`;
+            courseEval[2].attackType = "makuri";
+            courseEval[1].firstScore -= 10 * cw.ws;
+            if (courseEval[3].b.manualTactic === "auto") {
+              courseEval[3].firstScore += (10 + vSashiMod) * cw.ws;
+              courseEval[3].placeScore += 18 * cw.ws;
+              courseEval[3].roleText = "📐2C捲り連動差";
+              courseEval[3].attackType = "sashi";
+            }
+          }
+        }
+
         let kadoMakuriTrigger = false;
         if (kadoCourse >= 3 && kadoCourse <= 6) {
           const kadoObj = courseEval[kadoCourse];
           const receiverObj = courseEval[kadoCourse - 1];
-          if (kadoObj.slitPower - receiverObj.slitPower >= 11 && kadoObj.b.manualTactic === "auto") {
+          if ((kadoObj.slitPower - receiverObj.slitPower >= 11 || kadoObj.effMakuriRate >= 14.0) && kadoObj.b.manualTactic === "auto") {
             kadoMakuriTrigger = true;
             const fPen = (af.fCount && kadoObj.b.fCount > 0) ? 0.55 : 1.0;
             kadoObj.firstScore += (16 + vMakuriMod) * fPen * cw.ws;
-            kadoObj.roleText = kadoObj.b.fCount > 0 ? "🔥カド攻(F持)" : "🔥カドまくり";
-            kadoObj.attackType = "makuri";
+            if (kadoObj.effMsRate > kadoObj.effMakuriRate + 2.0) {
+              kadoObj.roleText = `⚡カド捲差(${kadoObj.effMsRate.toFixed(1)}%)`;
+              kadoObj.attackType = "makurisashi";
+            } else {
+              kadoObj.roleText = kadoObj.b.fCount > 0 ? "🔥カド攻(F持)" : `🔥カドまくり(${kadoObj.effMakuriRate.toFixed(1)}%)`;
+              kadoObj.attackType = "makuri";
+            }
             receiverObj.firstScore -= 12 * cw.ws;
             receiverObj.placeScore -= 10 * cw.ws;
             receiverObj.roleText = "⚠️壁崩壊・被弾";
@@ -1356,7 +1545,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           } else if (tac === "sashi") {
             obj.firstScore += (22 + vSashiMod) * cw.ws;
             obj.placeScore += 28 * cw.ws;
-            obj.roleText = "🎯指定:1M差し";
+            obj.roleText = `🎯指定:差し(${obj.effSashiRate.toFixed(1)}%)`;
             manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【1M差し】を指定 → ターンマーク際を鋭く差し抜け`);
             if (courseEval[1] && c >= 2) {
               courseEval[1].placeScore += 12 * cw.ws;
@@ -1364,7 +1553,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           } else if (tac === "makuri") {
             obj.firstScore += (36 + vMakuriMod) * cw.ws;
             obj.placeScore += 16 * cw.ws;
-            obj.roleText = "🎯指定:まくり";
+            obj.roleText = `🎯指定:まくり(${obj.effMakuriRate.toFixed(1)}%)`;
             manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【まくり】を指定 → 内枠被弾＆${c < 6 ? c + 1 + "コース以下が展開連動" : "外連動"}`);
             for (let inner = 1; inner < c; inner++) {
               courseEval[inner].firstScore -= (inner === c - 1 ? 22 : 16) * cw.ws;
@@ -1389,7 +1578,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           } else if (tac === "makurisashi") {
             obj.firstScore += (28 + vSashiMod) * cw.ws;
             obj.placeScore += 26 * cw.ws;
-            obj.roleText = "🎯指定:まくり差";
+            obj.roleText = `🎯指定:捲差(${obj.effMsRate.toFixed(1)}%)`;
             manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【まくり差し】を指定`);
             if (courseEval[c - 1] && c > 2) {
               courseEval[c - 1].firstScore -= 12 * cw.ws;
@@ -1400,7 +1589,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             const clashBoost = hasActiveMakuri ? 14 : 6;
             obj.firstScore += (12 + vSashiMod + clashBoost) * cw.ws;
             obj.placeScore += (32 + clashBoost * 0.8) * cw.ws;
-            obj.roleText = "🎯指定:展開待ち";
+            obj.roleText = `🎯指定:展開待(${obj.effWaitRate.toFixed(0)}%)`;
             manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【展開待ち(最内・連動差し)】を指定 → 1Mもつれ・引き波を突いて上位浮上`);
           } else if (tac === "sotomai") {
             obj.firstScore += 8 * cw.ws;
@@ -1426,6 +1615,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           }
         }
 
+        // AI自動判定（コース別の差し率・まくり率・まくり差し率・展開待ち率のうち最も高い武器を自動選択）
         for (let c = 1; c <= 6; c++) {
           const obj = courseEval[c];
           if (c >= 2) {
@@ -1437,37 +1627,43 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           }
           if (obj.roleText === "標準") {
             if (c === 1) {
-              obj.roleText = "🛡️イン先マイ";
+              obj.roleText = `🛡️イン先マイ(${obj.effMakuriRate.toFixed(0)}%)`;
               obj.attackType = "nige";
             } else if (c === 2) {
-              obj.roleText = "📐2C差し追走";
-              obj.attackType = "sashi";
-            } else if (c === 3) {
-              if (obj.slitPower >= courseEval[2].slitPower + 5) {
-                obj.roleText = obj.b.visTurn >= 1 ? "⚡3Cまくり差し" : "🌀3C外マイ攻め";
-                obj.attackType = obj.b.visTurn >= 1 ? "makurisashi" : "sotomai";
+              if (obj.effMakuriRate > obj.effSashiRate) {
+                obj.roleText = `🔥2Cまくり(${obj.effMakuriRate.toFixed(1)}%)`;
+                obj.attackType = "makuri";
               } else {
-                obj.roleText = "📐3C差し・連動";
+                obj.roleText = `📐2C差し(${obj.effSashiRate.toFixed(1)}%)`;
                 obj.attackType = "sashi";
               }
-            } else if (c === 4) {
-              if (obj.isKado && obj.slitPower >= 56) {
-                obj.roleText = "⚡4カドまくり差";
+            } else if (c === 3 || c === 4) {
+              if (obj.effMakuriRate >= obj.effMsRate && obj.effMakuriRate >= obj.effSashiRate) {
+                obj.roleText = `🔥${c}Cまくり(${obj.effMakuriRate.toFixed(1)}%)`;
+                obj.attackType = "makuri";
+              } else if (obj.effMsRate >= obj.effSashiRate) {
+                obj.roleText = `⚡${c}C捲り差(${obj.effMsRate.toFixed(1)}%)`;
                 obj.attackType = "makurisashi";
               } else {
-                obj.roleText = "📐4C差し・展開待";
+                obj.roleText = `📐${c}C差し(${obj.effSashiRate.toFixed(1)}%)`;
                 obj.attackType = "sashi";
               }
             } else if (c === 5) {
-              obj.roleText = "⏳5C展開待ち差";
-              obj.attackType = "tenkaimachi";
+              if (obj.effMsRate >= 9.0) {
+                obj.roleText = `⚡5Cまくり差(${obj.effMsRate.toFixed(1)}%)`;
+                obj.attackType = "makurisashi";
+              } else {
+                obj.roleText = `⏳5C展開待(${obj.effWaitRate.toFixed(0)}%)`;
+                obj.attackType = "tenkaimachi";
+              }
             } else if (c === 6) {
-              obj.roleText = "⏳6C最内展開待ち";
+              obj.roleText = `⏳6C展開待(${obj.effWaitRate.toFixed(0)}%)`;
               obj.attackType = "tenkaimachi";
             }
           }
         }
 
+        renderCourseAttackMatrix(courseEval);
         renderSlitMap(courseEval, kadoCourse);
         const kimariteStats = renderKimariteBars(courseEval);
         renderScoreTable(courseEval);
@@ -1487,6 +1683,31 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           manualNotes,
           kimariteStats
         );
+        evaluateUserPredictions();
+      }
+
+      function renderCourseAttackMatrix(courseEval) {
+        const tbody = document.getElementById("courseAttackMatrixBody");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        for (let c = 1; c <= 6; c++) {
+          const obj = courseEval[c];
+          const makuriLabel = c === 1 ? `逃げ ${obj.effMakuriRate.toFixed(1)}%` : `まくり ${obj.effMakuriRate.toFixed(1)}%`;
+          const sashiHighlight = c >= 2 && obj.effSashiRate >= obj.effMakuriRate && obj.effSashiRate >= obj.effMsRate ? "text-emerald-300 font-black underline" : "text-emerald-300/80";
+          const makuriHighlight = c === 1 || (obj.effMakuriRate > obj.effSashiRate && obj.effMakuriRate >= obj.effMsRate) ? "text-rose-300 font-black underline" : "text-rose-300/80";
+          const msHighlight = c >= 2 && obj.effMsRate > obj.effMakuriRate && obj.effMsRate > obj.effSashiRate ? "text-amber-300 font-black underline" : "text-amber-300/80";
+
+          tbody.innerHTML += `
+          <tr>
+            <td class="py-1 font-bold text-slate-300">${c}コース${obj.isKado ? '<span class="text-[9px] bg-rose-600 text-white px-1 rounded ml-1">カド</span>' : ""}</td>
+            <td class="py-1 flex items-center gap-1.5"><span class="boat-${obj.boatId} w-5 h-5 rounded text-[11px] font-black flex items-center justify-center">${obj.boatId}</span><span class="font-bold text-white">${obj.b.name}</span></td>
+            <td class="py-1"><span class="text-[10px] bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-sky-200 font-bold">${obj.roleText}</span></td>
+            <td class="py-1 text-right font-mono ${sashiHighlight}">${c === 1 ? `抜き ${obj.effSashiRate.toFixed(1)}%` : `${obj.effSashiRate.toFixed(1)}%`}</td>
+            <td class="py-1 text-right font-mono ${makuriHighlight}">${makuriLabel}</td>
+            <td class="py-1 text-right font-mono ${msHighlight}">${c === 1 ? "-" : `${obj.effMsRate.toFixed(1)}%`}</td>
+            <td class="py-1 text-right font-mono text-purple-300 font-bold">${obj.effWaitRate.toFixed(1)}%</td>
+          </tr>`;
+        }
       }
 
       function renderSlitMap(courseEval, kadoCourse) {
@@ -1498,19 +1719,19 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           const displayName = (obj.b.name || `${obj.boatId}号艇`).replace(/\s+/g, "");
           let arrowBadge = "";
           if (obj.attackType === "makuri") {
-            arrowBadge = `<span class="text-[10px] text-rose-400 font-bold ml-1">⤴まくり</span>`;
+            arrowBadge = `<span class="text-[10px] text-rose-400 font-bold ml-1">⤴まくり(${obj.effMakuriRate.toFixed(0)}%)</span>`;
           } else if (obj.attackType === "makurisashi") {
-            arrowBadge = `<span class="text-[10px] text-amber-300 font-bold ml-1">⚡まくり差し</span>`;
+            arrowBadge = `<span class="text-[10px] text-amber-300 font-bold ml-1">⚡捲差(${obj.effMsRate.toFixed(0)}%)</span>`;
           } else if (obj.attackType === "sashi") {
-            arrowBadge = `<span class="text-[10px] text-emerald-400 font-bold ml-1">📐差し</span>`;
+            arrowBadge = `<span class="text-[10px] text-emerald-400 font-bold ml-1">📐差し(${obj.effSashiRate.toFixed(0)}%)</span>`;
           } else if (obj.attackType === "tenkaimachi") {
-            arrowBadge = `<span class="text-[10px] text-purple-300 font-bold ml-1">⏳展開待ち</span>`;
+            arrowBadge = `<span class="text-[10px] text-purple-300 font-bold ml-1">⏳展開待(${obj.effWaitRate.toFixed(0)}%)</span>`;
           } else if (obj.attackType === "sotomai") {
             arrowBadge = `<span class="text-[10px] text-cyan-300 font-bold ml-1">🌀外マイ</span>`;
           } else if (obj.attackType === "hekomi") {
             arrowBadge = `<span class="text-[10px] text-slate-400 font-bold ml-1">⚠️被弾/凹</span>`;
           } else if (c === 1) {
-            arrowBadge = `<span class="text-[10px] text-sky-400 font-bold ml-1">➡先マイ</span>`;
+            arrowBadge = `<span class="text-[10px] text-sky-400 font-bold ml-1">➡先マイ(${obj.effMakuriRate.toFixed(0)}%)</span>`;
           }
           container.innerHTML += `
           <div class="slit-lane ${c === kadoCourse ? "kado-line" : ""}">
@@ -1526,10 +1747,10 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
       function renderKimariteBars(courseEval) {
         const arr = Object.values(courseEval);
         const nigeW = Math.max(8, courseEval[1].firstScore * (courseEval[1].attackType === "hekomi" ? 0.45 : 1.0));
-        const sashiW = Math.max(6, arr.filter(x => x.courseNo >= 2).reduce((s, x) => s + (x.attackType === "sashi" ? x.firstScore * 0.52 : x.placeScore * 0.16), 0));
-        const makuriW = Math.max(6, arr.filter(x => x.courseNo >= 3).reduce((s, x) => s + (x.attackType === "makuri" ? x.firstScore * 0.68 : x.firstScore * 0.18), 0));
-        const msW = Math.max(6, arr.filter(x => x.courseNo >= 3).reduce((s, x) => s + (x.attackType === "makurisashi" ? x.firstScore * 0.62 : x.placeScore * 0.18), 0));
-        const waitW = Math.max(5, arr.filter(x => x.courseNo >= 3).reduce((s, x) => s + (x.attackType === "tenkaimachi" ? x.firstScore * 0.48 : x.placeScore * 0.12), 0));
+        const sashiW = Math.max(6, arr.filter(x => x.courseNo >= 2).reduce((s, x) => s + (x.attackType === "sashi" ? x.firstScore * 0.55 : x.effSashiRate * 1.6), 0));
+        const makuriW = Math.max(6, arr.filter(x => x.courseNo >= 2).reduce((s, x) => s + (x.attackType === "makuri" ? x.firstScore * 0.65 : x.effMakuriRate * 1.7), 0));
+        const msW = Math.max(6, arr.filter(x => x.courseNo >= 3).reduce((s, x) => s + (x.attackType === "makurisashi" ? x.firstScore * 0.60 : x.effMsRate * 1.8), 0));
+        const waitW = Math.max(5, arr.filter(x => x.courseNo >= 3).reduce((s, x) => s + (x.attackType === "tenkaimachi" ? x.firstScore * 0.45 : x.effWaitRate * 0.35), 0));
         const sum = nigeW + sashiW + makuriW + msW + waitW;
 
         const items = [
@@ -1589,26 +1810,67 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         const arr = Object.values(courseEval);
         const inObj = courseEval[1];
         const c2Obj = courseEval[2];
+        const c3Obj = courseEval[3];
+        const c4Obj = courseEval[4];
         const kadoObj = courseEval[kadoCourse] || courseEval[4];
 
+        // ---------------------------------------------------------
+        // 1. パターンA（イン逃げ：1コース1着）専用連対スコアと全20通り買い目生成
+        // ---------------------------------------------------------
         const inFollowers = arr
           .filter(x => x.courseNo !== 1)
           .map(x => {
             let s = x.placeScore;
-            if (x.courseNo === 2 && x.attackType !== "hekomi") s += 10;
-            if (x.courseNo === 3 && ["sotomai", "makurisashi", "sashi"].includes(x.attackType)) s += 8;
+            if (x.courseNo === 2 && x.attackType !== "hekomi") s += 10 + x.effSashiRate * 0.35;
+            if (x.courseNo === 3 && ["sotomai", "makurisashi", "sashi"].includes(x.attackType)) s += 8 + x.effMsRate * 0.3;
             if (x.attackType === "sashi") s += 7;
-            if (x.attackType === "tenkaimachi") s += 6;
+            if (x.attackType === "tenkaimachi") s += 6 + x.effWaitRate * 0.12;
             return { ...x, inFollowScore: s };
           })
           .sort((a, b) => b.inFollowScore - a.inFollowScore);
 
-        const inP1 = inFollowers[0], inP2 = inFollowers[1], inP3 = inFollowers[2], inP4 = inFollowers[3];
+        const inP1 = inFollowers[0], inP2 = inFollowers[1], inP3 = inFollowers[2], inP4 = inFollowers[3], inP5 = inFollowers[4];
 
+        // パターンA 全20通りをスコア順に生成（6点上限を完全撤廃）
+        const rawPatternAList = [];
+        inFollowers.forEach((secondObj, idx2) => {
+          inFollowers.forEach((thirdObj, idx3) => {
+            if (secondObj.boatId === thirdObj.boatId) return;
+            const comboScore = secondObj.inFollowScore * 1.45 + thirdObj.inFollowScore * 0.85 + (thirdObj.attackType === "tenkaimachi" ? 6 : 0);
+            rawPatternAList.push({
+              l1: inObj.boatId,
+              l2: secondObj.boatId,
+              l3: thirdObj.boatId,
+              score: comboScore,
+              idx2,
+              idx3
+            });
+          });
+        });
+        rawPatternAList.sort((a, b) => b.score - a.score);
+
+        const patternABetsPool = rawPatternAList.map((item, rankIdx) => {
+          const typeLabel = rankIdx < 2 ? "イン本線◎" : rankIdx < 4 ? "イン対抗○" : rankIdx < 7 ? "イン差し▲" : rankIdx < 11 ? "イン展開待★" : "イン抑え△";
+          const estProb = Math.max(1.2, Math.round((16.5 * Math.pow(0.83, rankIdx)) * 10) / 10);
+          const estOdds = Math.round((6.5 + rankIdx * 3.8 + (rankIdx >= 6 ? rankIdx * 2.5 : 0)) * 10) / 10;
+          return {
+            pattern: "A",
+            type: typeLabel,
+            l1: item.l1,
+            l2: item.l2,
+            l3: item.l3,
+            prob: estProb,
+            odds: estOdds
+          };
+        });
+
+        // ---------------------------------------------------------
+        // 2. パターンB（イン逃げ以外：2〜6コース1着）専用スコアと全30通り買い目生成
+        // ---------------------------------------------------------
         const nonInWinners = arr
           .filter(x => x.courseNo !== 1)
           .map(x => {
-            let s = x.firstScore;
+            let s = x.firstScore + (x.effSashiRate * 0.5 + x.effMakuriRate * 0.65 + x.effMsRate * 0.6);
             if (x.attackType === "makuri") s += 14;
             if (x.attackType === "makurisashi") s += 12;
             if (x.attackType === "sashi") s += 10;
@@ -1619,38 +1881,69 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
 
         const nonIn1 = nonInWinners[0];
         const nonIn2 = nonInWinners[1];
+        const nonIn3 = nonInWinners[2];
 
-        const nonIn1Followers = arr
-          .filter(x => x.boatId !== nonIn1.boatId)
-          .map(x => {
-            let s = x.placeScore;
-            if (nonIn1.attackType === "makuri") {
-              if (x.courseNo === nonIn1.courseNo + 1) s += 22;
-              if (x.courseNo === nonIn1.courseNo + 2 || x.attackType === "tenkaimachi") s += 16;
-              if (x.courseNo < nonIn1.courseNo) s -= 12;
-            } else if (nonIn1.attackType === "sashi" || nonIn1.attackType === "makurisashi") {
-              if (x.courseNo === 1) s += 20;
-              if (x.attackType === "tenkaimachi") s += 12;
-            } else if (nonIn1.attackType === "tenkaimachi") {
-              if (x.courseNo === 1 || x.isKado) s += 14;
-            }
-            return { ...x, followScore: s };
-          })
-          .sort((a, b) => b.followScore - a.followScore);
+        const getFollowersForWinner = (winnerObj) => {
+          return arr
+            .filter(x => x.boatId !== winnerObj.boatId)
+            .map(x => {
+              let s = x.placeScore;
+              if (winnerObj.attackType === "makuri") {
+                if (x.courseNo === winnerObj.courseNo + 1) s += 24;
+                if (x.courseNo === winnerObj.courseNo + 2 || x.attackType === "tenkaimachi") s += 18;
+                if (x.courseNo < winnerObj.courseNo) s -= 12;
+              } else if (winnerObj.attackType === "sashi" || winnerObj.attackType === "makurisashi") {
+                if (x.courseNo === 1) s += 22;
+                if (x.attackType === "tenkaimachi") s += 14;
+              } else if (winnerObj.attackType === "tenkaimachi") {
+                if (x.courseNo === 1 || x.isKado) s += 16;
+              }
+              return { ...x, followScore: s };
+            })
+            .sort((a, b) => b.followScore - a.followScore);
+        };
 
+        const nonIn1Followers = getFollowersForWinner(nonIn1);
         const nf1 = nonIn1Followers[0], nf2 = nonIn1Followers[1], nf3 = nonIn1Followers[2];
-
-        const nonIn2Followers = arr
-          .filter(x => x.boatId !== nonIn2.boatId)
-          .map(x => {
-            let s = x.placeScore;
-            if (x.courseNo === 1 && nonIn2.attackType !== "makuri") s += 16;
-            if (x.courseNo === nonIn2.courseNo + 1 || x.attackType === "tenkaimachi") s += 15;
-            return { ...x, followScore: s };
-          })
-          .sort((a, b) => b.followScore - a.followScore);
-
+        const nonIn2Followers = getFollowersForWinner(nonIn2);
         const ng1 = nonIn2Followers[0], ng2 = nonIn2Followers[1];
+
+        const rawPatternBList = [];
+        nonInWinners.slice(0, 4).forEach((wObj, wRank) => {
+          const flist = getFollowersForWinner(wObj);
+          flist.slice(0, 4).forEach((f2, idx2) => {
+            flist.slice(0, 4).forEach((f3, idx3) => {
+              if (f2.boatId === f3.boatId) return;
+              const sc = wObj.nonInWinScore * 1.25 + f2.followScore * 0.95 + f3.followScore * 0.65 - wRank * 8;
+              rawPatternBList.push({
+                l1: wObj.boatId,
+                l2: f2.boatId,
+                l3: f3.boatId,
+                wObj,
+                f2,
+                f3,
+                score: sc
+              });
+            });
+          });
+        });
+        rawPatternBList.sort((a, b) => b.score - a.score);
+
+        const patternBBetsPool = rawPatternBList.slice(0, 24).map((item, rankIdx) => {
+          const atkName = item.wObj.attackType === "makuri" ? "まくり連動" : item.wObj.attackType === "sashi" ? "差し逆転" : item.wObj.attackType === "makurisashi" ? "捲差逆転" : "展開待ち穴";
+          const mark = rankIdx < 2 ? "◎" : rankIdx < 5 ? "○" : rankIdx < 9 ? "▲" : rankIdx < 14 ? "★" : "☆";
+          const estProb = Math.max(0.8, Math.round((8.8 * Math.pow(0.86, rankIdx)) * 10) / 10);
+          const estOdds = Math.round((21.0 + rankIdx * 6.5) * 10) / 10;
+          return {
+            pattern: "B",
+            type: `${atkName}${mark}`,
+            l1: item.l1,
+            l2: item.l2,
+            l3: item.l3,
+            prob: estProb,
+            odds: estOdds
+          };
+        });
 
         const exBest = [...arr].sort((a, b) => (a.b.exTime || 6.80) - (b.b.exTime || 6.80))[0];
         const motorBest = [...arr].sort((a, b) => (b.b.motorBi || 35) - (a.b.motorBi || 35))[0];
@@ -1680,9 +1973,12 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           </div>
 
           <div class="space-y-1 border-b border-slate-800 pb-2">
-            <div class="text-emerald-400 font-bold">② 進入・スリット隊形 ＆ 1マークの攻め（差し・展開待ち連動）</div>
-            <p>進入は<strong>[${arr.map(x => x.boatId).join("-")}]</strong>、カドは<strong>${kadoCourse}コース（${kadoObj.boatId}号艇・${kadoObj.b.name} / 想定ST .${Math.round(kadoObj.expectedSt * 100).toString().padStart(2, "0")}）</strong>、イン起こしは<strong>${deepLabel}</strong>と診断。1コース${inObj.boatId}号艇（${inObj.b.name}）の想定STは<strong>.${Math.round(inObj.expectedSt * 100).toString().padStart(2, "0")}</strong>、壁となる2コース${c2Obj.boatId}号艇（${c2Obj.b.name}）の逃がし率は<strong>${c2Obj.b.nigashi.toFixed(1)}%</strong>です。</p>
-            <p>展示時計トップは<strong>${exBest.boatId}号艇・${exBest.b.name}（${exBest.b.exTime.toFixed(2)}秒）</strong>、モーター2連率最上位は<strong>${motorBest.boatId}号艇・${motorBest.b.name}（${motorBest.b.motorBi.toFixed(1)}%）</strong>。1マークの攻め手としては、ターンマーク際を鋭く狙う<strong>【📐差し勢：${sashiNames}】</strong>と、センター勢の仕掛けや1Mの引き波・もつれを冷静に見極めて最内・ブイ際を突く<strong>【⏳展開待ち勢：${waitNames}】</strong>の連対浮上が鍵を握ります。</p>
+            <div class="text-emerald-400 font-bold">② コース別の攻め方・決まり手成功率（2C差し/まくり率・センター攻め率）</div>
+            <p>・<strong>1コース（${inObj.boatId}号艇・${inObj.b.name}）</strong>：イン逃げ成功率 <strong>${inObj.effMakuriRate.toFixed(1)}%</strong>（想定ST .${Math.round(inObj.expectedSt * 100).toString().padStart(2, "0")} / 起こし:${deepLabel}）<br>
+               ・<strong>2コース（${c2Obj.boatId}号艇・${c2Obj.b.name}）</strong>：<strong>📐差し成功率 ${c2Obj.effSashiRate.toFixed(1)}% ／ 🔥まくり成功率 ${c2Obj.effMakuriRate.toFixed(1)}%</strong> ／ 壁としての逃がし率 ${c2Obj.b.nigashi.toFixed(1)}%<br>
+               ・<strong>3コース（${c3Obj.boatId}号艇・${c3Obj.b.name}）</strong>：<strong>🔥まくり率 ${c3Obj.effMakuriRate.toFixed(1)}% ／ ⚡まくり差し率 ${c3Obj.effMsRate.toFixed(1)}% ／ 📐差し率 ${c3Obj.effSashiRate.toFixed(1)}%</strong><br>
+               ・<strong>4コース（${c4Obj.boatId}号艇・${c4Obj.b.name}）</strong>：<strong>🔥まくり率 ${c4Obj.effMakuriRate.toFixed(1)}% ／ ⚡まくり差し率 ${c4Obj.effMsRate.toFixed(1)}% ／ ⏳展開待ち連対率 ${c4Obj.effWaitRate.toFixed(1)}%</strong><br>
+               ・展示時計トップは<strong>${exBest.boatId}号艇・${exBest.b.name}（${exBest.b.exTime.toFixed(2)}秒）</strong>、モーター2連率トップは<strong>${motorBest.boatId}号艇・${motorBest.b.name}（${motorBest.b.motorBi.toFixed(1)}%）</strong>です。</p>
           </div>
 
           <div class="bg-sky-950/40 border border-sky-500/40 rounded-lg p-2.5 space-y-1">
@@ -1690,48 +1986,31 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
               <span>🟦 【パターンA：イン逃げ本線シナリオ】</span>
               <span class="text-[11px] bg-sky-500 text-slate-950 font-black px-2 py-0.5 rounded">成立確率 ${kimariteStats.inEscapePct}%</span>
             </div>
-            <p>1コース<strong>${inObj.boatId}号艇（${inObj.b.name}）</strong>がスタート互角（想定.${Math.round(inObj.expectedSt * 100).toString().padStart(2, "0")}）から1マークを先マイして押し切る王道シナリオです。2番手争いは、${inP1.roleText}からスムーズに追走する<strong>${inP1.boatId}号艇（${inP1.b.name}）</strong>と、${inP2.roleText}で浮上する<strong>${inP2.boatId}号艇（${inP2.b.name}）</strong>が軸。3着ヒモには展開待ちから最内を拾う<strong>${inP3.boatId}号艇（${inP3.b.name}）・${inP4.boatId}号艇（${inP4.b.name}）</strong>までケアした<strong>「${inObj.boatId}-${inP1.boatId}${inP2.boatId}-${inP1.boatId}${inP2.boatId}${inP3.boatId}」</strong>が本線となります。</p>
+            <p>1コース<strong>${inObj.boatId}号艇（${inObj.b.name}）</strong>が先マイ押し切り（逃げ成功率${inObj.effMakuriRate.toFixed(1)}%）。2番手争いは、${inP1.roleText}から追走する<strong>${inP1.boatId}号艇（${inP1.b.name}）</strong>と、${inP2.roleText}で浮上する<strong>${inP2.boatId}号艇（${inP2.b.name}）</strong>が軸。3着ヒモには展開待ち連対率の高い<strong>${inP3.boatId}号艇（${inP3.b.name}）・${inP4.boatId}号艇（${inP4.b.name}）</strong>までケアした<strong>「${inObj.boatId}-${inP1.boatId}${inP2.boatId}-${inP1.boatId}${inP2.boatId}${inP3.boatId}${inP4.boatId}」</strong>が本線です。</p>
           </div>
 
           <div class="bg-rose-950/40 border border-rose-500/40 rounded-lg p-2.5 space-y-1">
             <div class="text-rose-300 font-bold flex items-center justify-between">
-              <span>🟥 【パターンB：イン逃げ以外（逆転・波乱）シナリオ】</span>
+              <span>🟥 【パターンB：イン逃げ以外（差し・まくり・展開待ち逆転）シナリオ】</span>
               <span class="text-[11px] bg-rose-500 text-white font-black px-2 py-0.5 rounded">成立確率 ${kimariteStats.nonInPct}%</span>
             </div>
-            <p>インの${inObj.boatId}号艇が風・波やカド攻め、またはターン流れて敗れる非インシナリオです。逆転1着の筆頭は<strong>${nonIn1.courseNo}コース${nonIn1.boatId}号艇（${nonIn1.b.name} / ${nonIn1.roleText}）</strong>、対抗アタマは<strong>${nonIn2.courseNo}コース${nonIn2.boatId}号艇（${nonIn2.b.name} / ${nonIn2.roleText}）</strong>。${nonIn1.boatId}号艇が仕掛けた場合、1Mの引き波を超えてスジ連動する<strong>${nf1.boatId}号艇（${nf1.b.name} / ${nf1.roleText}）</strong>と、展開待ちから突き抜ける<strong>${nf2.boatId}号艇（${nf2.b.name} / ${nf2.roleText}）</strong>への<strong>「${nonIn1.boatId}-${nf1.boatId}${nf2.boatId}-${nf1.boatId}${nf2.boatId}${nf3.boatId}」</strong>および<strong>「${nonIn2.boatId}-${ng1.boatId}-${ng2.boatId}」</strong>が高配当の狙い目です。</p>
+            <p>インの${inObj.boatId}号艇が敗れる場合、逆転1着の筆頭はコース別攻め成功率上位の<strong>${nonIn1.courseNo}コース${nonIn1.boatId}号艇（${nonIn1.b.name} / ${nonIn1.roleText}）</strong>、対抗アタマは<strong>${nonIn2.courseNo}コース${nonIn2.boatId}号艇（${nonIn2.b.name} / ${nonIn2.roleText}）</strong>。${nonIn1.boatId}号艇が攻めた際、スジ連動する<strong>${nf1.boatId}号艇（${nf1.b.name}）</strong>と展開待ちから突き抜ける<strong>${nf2.boatId}号艇（${nf2.b.name}）</strong>への<strong>「${nonIn1.boatId}-${nf1.boatId}${nf2.boatId}-${nf1.boatId}${nf2.boatId}${nf3.boatId}」</strong>および<strong>「${nonIn2.boatId}-${ng1.boatId}-${ng2.boatId}」</strong>が高配当の勝負目です。</p>
           </div>
         `;
         document.getElementById("aiNarrativeBox").innerHTML = longHtml;
 
         const nameOf = (id) => (boatsData[id]?.name || `${id}`).split(" ")[0];
 
-        const patternABetsPool = [
-          { pattern: "A", type: "イン本線◎", l1: inObj.boatId, l2: inP1.boatId, l3: inP2.boatId, prob: 18.0, odds: 6.8 },
-          { pattern: "A", type: "イン本線○", l1: inObj.boatId, l2: inP2.boatId, l3: inP1.boatId, prob: 12.5, odds: 10.5 },
-          { pattern: "A", type: "イン差し▲", l1: inObj.boatId, l2: inP1.boatId, l3: inP3.boatId, prob: 9.5, odds: 14.8 },
-          { pattern: "A", type: "イン展開待★", l1: inObj.boatId, l2: inP3.boatId, l3: inP1.boatId, prob: 6.5, odds: 23.0 },
-          { pattern: "A", type: "イン抑え△", l1: inObj.boatId, l2: inP2.boatId, l3: inP3.boatId, prob: 5.0, odds: 19.5 },
-          { pattern: "A", type: "イン展開穴☆", l1: inObj.boatId, l2: inP1.boatId, l3: inP4.boatId, prob: 4.0, odds: 27.0 }
-        ];
-
-        const patternBBetsPool = [
-          { pattern: "B", type: "非イン本線◎", l1: nonIn1.boatId, l2: nf1.boatId, l3: nf2.boatId, prob: 8.5, odds: 24.5 },
-          { pattern: "B", type: "非イン連動○", l1: nonIn1.boatId, l2: nf2.boatId, l3: nf1.boatId, prob: 6.5, odds: 32.0 },
-          { pattern: "B", type: "非イン展開待▲", l1: nonIn1.boatId, l2: nf1.boatId, l3: nf3.boatId, prob: 5.0, odds: 41.0 },
-          { pattern: "B", type: "逆転差し★", l1: nonIn2.boatId, l2: ng1.boatId, l3: ng2.boatId, prob: 4.5, odds: 36.0 },
-          { pattern: "B", type: "逆転連動△", l1: nonIn2.boatId, l2: ng2.boatId, l3: ng1.boatId, prob: 3.5, odds: 48.0 },
-          { pattern: "B", type: "展開待ち大穴☆", l1: nonIn1.boatId, l2: nf3.boatId, l3: nf1.boatId, prob: 2.8, odds: 58.0 }
-        ];
-
         const patternMode = document.getElementById("patternFilterSelect")?.value || "both";
-        const ticketCount = Number(document.getElementById("ticketCountSelect")?.value || 8);
-        const budget = Math.max(400, Number(document.getElementById("budgetInput")?.value || 4000));
+        const ticketCount = Number(document.getElementById("ticketCountSelect")?.value || 12);
+        const budget = Math.max(400, Number(document.getElementById("budgetInput")?.value || 5000));
 
+        // 6点制限を撤廃：指定された点数（4〜24点）を完全に満たすように抽出
         let selectedBets = [];
         if (patternMode === "in_only") {
-          selectedBets = patternABetsPool.slice(0, Math.min(6, ticketCount));
+          selectedBets = patternABetsPool.slice(0, ticketCount);
         } else if (patternMode === "non_in_only") {
-          selectedBets = patternBBetsPool.slice(0, Math.min(6, ticketCount));
+          selectedBets = patternBBetsPool.slice(0, ticketCount);
         } else {
           const halfA = Math.ceil(ticketCount / 2);
           const halfB = Math.floor(ticketCount / 2);
@@ -1744,11 +2023,33 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           runners: `${nameOf(b.l1)}→${nameOf(b.l2)}→${nameOf(b.l3)}`
         }));
 
+        // My予想チェッカー用に現在のシミュレーション結果を保存
+        latestSimContext = {
+          courseEval,
+          inObj,
+          c2Obj,
+          c3Obj,
+          c4Obj,
+          kadoObj,
+          inFollowers,
+          nonInWinners,
+          nonIn1,
+          nonIn2,
+          nonIn3,
+          nf1,
+          nf2,
+          nf3,
+          kimariteStats,
+          patternABetsPool,
+          patternBBetsPool,
+          selectedBets: bets
+        };
+
         const totalProb = bets.reduce((s, x) => s + x.prob, 0);
         const allocs = bets.map(x => Math.max(100, Math.round(((x.prob / totalProb) * budget) / 100) * 100));
         let sumAlloc = allocs.reduce((a, b) => a + b, 0);
         let k = 0;
-        while (sumAlloc !== budget && k < 100) {
+        while (sumAlloc !== budget && k < 200) {
           if (sumAlloc < budget) { allocs[k % allocs.length] += 100; sumAlloc += 100; }
           else if (allocs[allocs.length - 1 - (k % allocs.length)] > 100) {
             allocs[allocs.length - 1 - (k % allocs.length)] -= 100; sumAlloc -= 100;
@@ -1792,8 +2093,8 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         const groupB = bets.map((b, idx) => ({ b, idx })).filter(x => x.b.pattern === "B");
 
         recBox.innerHTML =
-          renderBetGroup(`🟦 パターンA：イン逃げ予想（1コース${inObj.boatId}号艇・${inObj.b.name} 先マイ押し切り / 成立率 ${kimariteStats.inEscapePct}%）`, "bg-sky-950/80 text-sky-300 border border-sky-600/40", groupA) +
-          renderBetGroup(`🟥 パターンB：イン逃げ以外予想（${nonIn1.boatId}号艇${nonIn1.b.name}・${nonIn2.boatId}号艇${nonIn2.b.name} 差し・まくり・展開待ち逆転 / 成立率 ${kimariteStats.nonInPct}%）`, "bg-rose-950/80 text-rose-300 border border-rose-600/40", groupB);
+          renderBetGroup(`🟦 パターンA：イン逃げ予想（${groupA.length}点 ／ 1C${inObj.boatId}号艇・${inObj.b.name} 逃げ成功率 ${inObj.effMakuriRate.toFixed(1)}%）`, "bg-sky-950/80 text-sky-300 border border-sky-600/40", groupA) +
+          renderBetGroup(`🟥 パターンB：イン逃げ以外予想（${groupB.length}点 ／ ${nonIn1.boatId}号艇${nonIn1.b.name}・${nonIn2.boatId}号艇${nonIn2.b.name} 差し・まくり・展開待ち逆転）`, "bg-rose-950/80 text-rose-300 border border-rose-600/40", groupB);
 
         // ---------------------------------------------------------
         // 5. 収益化・配信テンプレート出力（note有料分割 / X集客ポスト / 全文）
@@ -1814,8 +2115,12 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           `・気象条件: ${windLabel} ／ 波高${wave}cm ／ ${tideLabel}`,
           g1ReportLine,
           ``,
-          `■ 2. 進入隊形・スリット展望 ＆ 直前展示ピックアップ`,
+          `■ 2. 進入隊形・コース別攻め成功率 ＆ 直前展示ピックアップ`,
           `・想定進入: [${arr.map(x => x.boatId).join("-")}] （${kadoCourse}コース${kadoObj.boatId}号艇・${kadoObj.b.name}がカド / イン:${deepLabel}）`,
+          `・1コース(${inObj.boatId}号艇 ${inObj.b.name}): 逃げ成功率 ${inObj.effMakuriRate.toFixed(1)}%`,
+          `・2コース(${c2Obj.boatId}号艇 ${c2Obj.b.name}): 差し成功率 ${c2Obj.effSashiRate.toFixed(1)}% ／ まくり成功率 ${c2Obj.effMakuriRate.toFixed(1)}%`,
+          `・3コース(${c3Obj.boatId}号艇 ${c3Obj.b.name}): まくり率 ${c3Obj.effMakuriRate.toFixed(1)}% ／ まくり差し率 ${c3Obj.effMsRate.toFixed(1)}%`,
+          `・4コース(${c4Obj.boatId}号艇 ${c4Obj.b.name}): まくり率 ${c4Obj.effMakuriRate.toFixed(1)}% ／ まくり差し率 ${c4Obj.effMsRate.toFixed(1)}%`,
           `・展示一番時計: ${exBest.boatId}号艇 ${exBest.b.name} (${exBest.b.exTime.toFixed(2)}秒)`,
           `・モーター2連率トップ: ${motorBest.boatId}号艇 ${motorBest.b.name} (${motorBest.b.motorBi.toFixed(1)}%)`,
           `・決まり手予測バランス: イン逃げ ${kimariteStats.inEscapePct}% vs イン逃げ以外(差し・まくり・展開待ち) ${kimariteStats.nonInPct}%`,
@@ -1838,9 +2143,9 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           `1Mの攻めで生じる引き波の懐を「差し」「展開待ち」で突く${nf1.boatId}号艇（${nf1.b.name}）・${nf2.boatId}号艇（${nf2.b.name}）の連動舟券で高配当を狙い撃ちます。`,
           ``,
           `🎯 4. 推奨3連単買い目・資金配分（計${bets.length}点 / 総予算${budget.toLocaleString()}円）`,
-          `【🟦 パターンA：イン逃げ推奨目】`,
+          `【🟦 パターンA：イン逃げ推奨目（${groupA.length}点）】`,
           `  ・${aCombos || "なし（非イン特化選択中）"}`,
-          `【🟥 パターンB：イン逃げ以外（逆転・穴）推奨目】`,
+          `【🟥 パターンB：イン逃げ以外（逆転・穴）推奨目（${groupB.length}点）】`,
           `  ・${bCombos || "なし（イン逃げ特化選択中）"}`,
           `※直前オッズでEV(期待値)105%以上の目を厚めに推奨。舟券の購入は自己責任でお楽しみください。`,
           `🎓 ぼーとだいがくせい｜X: https://x.com/Boatrace__daisu ｜ note: https://note.com/boatrace__daisu`,
@@ -1852,7 +2157,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           ``,
           `✅ 水面: ${windLabel} / 波${wave}cm`,
           `✅ 展示1番時計: ${exBest.boatId}号艇 ${exBest.b.name} (${exBest.b.exTime.toFixed(2)}s)`,
-          `✅ 想定カド: ${kadoCourse}コース(${kadoObj.boatId}号艇 ${kadoObj.b.name})`,
+          `✅ 2C(${c2Obj.boatId}号艇): 差し率${c2Obj.effSashiRate.toFixed(1)}% / まくり率${c2Obj.effMakuriRate.toFixed(1)}%`,
           `📊 AI決まり手予測: イン逃げ【${kimariteStats.inEscapePct}%】 vs 非イン逆転【${kimariteStats.nonInPct}%】`,
           ``,
           `1Mの「差し」「展開待ち」連動まで計算した【イン逃げ本線】＆【非イン高配当】の2パターン結論と厳選${bets.length}点はnoteで公開中👇`,
@@ -1876,6 +2181,274 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         if (reportFmt === "note_paywall") outEl.value = fullPaywallText;
         else if (reportFmt === "x_promo") outEl.value = xPromoText;
         else outEl.value = fullCombinedText;
+      }
+
+      // ---------------------------------------------------------
+      // 🧐 自分の予想を入力してAIが採点・スジ評価するチェッカー関数群
+      // ---------------------------------------------------------
+      function parseUserBetsString(rawStr) {
+        if (!rawStr) return [];
+        const tokens = rawStr
+          .replace(/、|，|\n|\r|\t/g, ",")
+          .split(/[,\s]+/)
+          .map(s => s.trim())
+          .filter(Boolean);
+
+        const comboSet = new Set();
+        const expandDigits = (part) => {
+          if (part === "全" || part === "9" || part.toUpperCase() === "ALL") return [1, 2, 3, 4, 5, 6];
+          return [...part.matchAll(/[1-6]/g)].map(m => Number(m[0]));
+        };
+
+        tokens.forEach(tok => {
+          const parts = tok.split(/[-=→>]/);
+          if (parts.length === 3) {
+            const p1 = expandDigits(parts[0]);
+            const p2 = expandDigits(parts[1]);
+            const p3 = expandDigits(parts[2]);
+            p1.forEach(a => {
+              p2.forEach(b => {
+                p3.forEach(c => {
+                  if (a !== b && b !== c && a !== c) {
+                    comboSet.add(`${a}-${b}-${c}`);
+                  }
+                });
+              });
+            });
+          } else if (/^[1-6]{3}$/.test(tok)) {
+            const a = Number(tok[0]), b = Number(tok[1]), c = Number(tok[2]);
+            if (a !== b && b !== c && a !== c) comboSet.add(`${a}-${b}-${c}`);
+          }
+        });
+        return Array.from(comboSet);
+      }
+
+      function addPresetUserFormation(str) {
+        const el = document.getElementById("userBetsInput");
+        if (el) {
+          el.value = str;
+          evaluateUserPredictions();
+        }
+      }
+
+      function clearUserBetsInput() {
+        const el = document.getElementById("userBetsInput");
+        if (el) {
+          el.value = "";
+          evaluateUserPredictions();
+        }
+      }
+
+      function loadAiBetsToUserInput() {
+        if (!latestSimContext || !latestSimContext.selectedBets) return;
+        const el = document.getElementById("userBetsInput");
+        if (el) {
+          el.value = latestSimContext.selectedBets.map(b => b.combo).join(", ");
+          evaluateUserPredictions();
+        }
+      }
+
+      function evaluateUserPredictions() {
+        const box = document.getElementById("userEvalResultBox");
+        if (!box || !latestSimContext) return;
+
+        const rawInput = document.getElementById("userBetsInput")?.value || "";
+        const userCombos = parseUserBetsString(rawInput);
+        const userScenario = document.getElementById("userScenarioSelect")?.value || "auto";
+
+        if (userCombos.length === 0) {
+          box.innerHTML = `<div class="text-xs text-slate-400 bg-slate-950/60 border border-slate-800 rounded p-2.5">💡 上の入力欄にあなたの買い目（例: <code>1-2-3, 1-2-4</code> や <code>1-23-2345</code>）を入力すると、AIが100点満点で展開整合性・スジ・死角（抜け目）を診断します。</div>`;
+          return;
+        }
+
+        const { courseEval, inObj, c2Obj, c3Obj, c4Obj, nonIn1, nonIn2, nf1, nf2, inFollowers, patternABetsPool, patternBBetsPool } = latestSimContext;
+        const boatToCourse = {};
+        Object.values(courseEval).forEach(obj => {
+          boatToCourse[obj.boatId] = obj;
+        });
+
+        const allAiMap = {};
+        [...patternABetsPool, ...patternBBetsPool].forEach(b => {
+          allAiMap[`${b.l1}-${b.l2}-${b.l3}`] = b;
+        });
+
+        const nameOf = (id) => (boatsData[id]?.name || `${id}`).split(" ")[0];
+
+        let sumFitScore = 0;
+        let sumProb = 0;
+        let inCount = 0;
+        let nonInCount = 0;
+        const headBoatsSet = new Set();
+        const secondBoatsByHead = {};
+
+        const evaluatedItems = userCombos.map(combo => {
+          const [b1, b2, b3] = combo.split("-").map(Number);
+          const o1 = boatToCourse[b1], o2 = boatToCourse[b2], o3 = boatToCourse[b3];
+          headBoatsSet.add(b1);
+          if (!secondBoatsByHead[b1]) secondBoatsByHead[b1] = new Set();
+          secondBoatsByHead[b1].add(b2);
+
+          if (o1.courseNo === 1) inCount++;
+          else nonInCount++;
+
+          const aiHit = allAiMap[combo];
+          let sujiBadge = "□ 標準連動";
+          let sujiCls = "bg-slate-800 text-slate-300";
+          let itemScore = 60;
+          let sujiComment = "";
+
+          if (o1.courseNo === 1) {
+            // イン逃げ目
+            const fRank2 = inFollowers.findIndex(x => x.boatId === b2);
+            const fRank3 = inFollowers.findIndex(x => x.boatId === b3);
+            if (fRank2 <= 1 && fRank3 <= 2) {
+              sujiBadge = "◎ 王道イン鉄板スジ";
+              sujiCls = "bg-sky-950 text-sky-300 border border-sky-600/40";
+              itemScore = 92;
+              sujiComment = `イン先マイから連対上位(${nameOf(b2)}・${nameOf(b3)})の王道本線`;
+            } else if (o2.attackType === "tenkaimachi" || o3.attackType === "tenkaimachi") {
+              sujiBadge = "⏳ イン＋展開待ち好妙味";
+              sujiCls = "bg-purple-950 text-purple-300 border border-purple-600/40";
+              itemScore = 85;
+              sujiComment = `1Mもつれを最内展開待ちで拾う高配当スジ`;
+            } else if (o2.attackType === "hekomi") {
+              sujiBadge = "⚠️ 壁崩壊・2着凹み懸念";
+              sujiCls = "bg-rose-950 text-rose-300 border border-rose-600/40";
+              itemScore = 45;
+              sujiComment = `${b2}号艇はスリット劣勢・被弾懸念があり2着軸にはリスク大`;
+            } else {
+              sujiBadge = "○ イン逃げ押さえ";
+              sujiCls = "bg-slate-800 text-sky-200";
+              itemScore = 74;
+              sujiComment = `イン逃げ時のヒモ穴ケア`;
+            }
+          } else {
+            // イン逃げ以外の目
+            if (o1.attackType === "makuri") {
+              if (o2.courseNo === o1.courseNo + 1 || o2.attackType === "tenkaimachi") {
+                sujiBadge = "🔥 まくり×外連動 絶好スジ";
+                sujiCls = "bg-amber-500/20 text-amber-300 border border-amber-500/50";
+                itemScore = 94;
+                sujiComment = `${o1.courseNo}Cまくり(${o1.effMakuriRate.toFixed(1)}%)から外隣・展開待ちが連動する黄金スジ！`;
+              } else if (o2.courseNo < o1.courseNo) {
+                sujiBadge = "⚠️ まくり被弾・逆スジ注意";
+                sujiCls = "bg-rose-950 text-rose-300 border border-rose-600/40";
+                itemScore = 52;
+                sujiComment = `${b1}号艇がまくると内側の${b2}号艇は引き波に沈みやすく、まくり差しなら成立`;
+              } else {
+                sujiBadge = "○ まくり一撃目";
+                sujiCls = "bg-slate-800 text-amber-200";
+                itemScore = 76;
+                sujiComment = `${o1.courseNo}Cまくり突破からの連対構成`;
+              }
+            } else if (o1.attackType === "sashi" || o1.attackType === "makurisashi") {
+              if (o2.courseNo === 1) {
+                sujiBadge = "📐 差し×イン残し 王道スジ";
+                sujiCls = "bg-emerald-950 text-emerald-300 border border-emerald-600/40";
+                itemScore = 91;
+                sujiComment = `${o1.courseNo}Cの${o1.attackType === "sashi" ? "差し" : "まくり差し"}が決まり1コースが残る鉄板スジ！`;
+              } else {
+                sujiBadge = "⚡ センター攻め連動";
+                sujiCls = "bg-slate-800 text-emerald-200";
+                itemScore = 79;
+                sujiComment = `差し・まくり差しからの波乱連動目`;
+              }
+            } else {
+              sujiBadge = "⏳ 展開待ち一撃大穴";
+              sujiCls = "bg-purple-950 text-purple-300 border border-purple-600/40";
+              itemScore = 75;
+              sujiComment = `1M激戦の隙を突く展開待ち高配当狙い`;
+            }
+          }
+
+          const estProb = aiHit ? aiHit.prob : Math.max(0.4, Math.round(((o1.firstScore / 220) * (o2.placeScore / 180) * (o3.placeScore / 190) * 6.5) * 10) / 10);
+          sumFitScore += itemScore;
+          sumProb += estProb;
+
+          return {
+            combo,
+            runners: `${nameOf(b1)}→${nameOf(b2)}→${nameOf(b3)}`,
+            estProb,
+            sujiBadge,
+            sujiCls,
+            itemScore,
+            sujiComment,
+            isAiRecommended: Boolean(aiHit)
+          };
+        });
+
+        // 総合スコア（100点満点）とS/A/B/Cランク算出
+        const avgFit = sumFitScore / evaluatedItems.length;
+        const coverageBonus = Math.min(15, sumProb * 0.32);
+        const countPenalty = evaluatedItems.length > 16 ? (evaluatedItems.length - 16) * 1.5 : 0;
+        const totalScore = Math.max(35, Math.min(99, Math.round(avgFit * 0.85 + coverageBonus - countPenalty)));
+        const gradeRank = totalScore >= 88 ? "S" : totalScore >= 78 ? "A" : totalScore >= 66 ? "B" : "C";
+        const rankColor = gradeRank === "S" ? "bg-amber-400 text-slate-950" : gradeRank === "A" ? "bg-sky-400 text-slate-950" : gradeRank === "B" ? "bg-emerald-400 text-slate-950" : "bg-slate-700 text-white";
+
+        // 死角（抜け目）と改善アドバイスの自動生成
+        const advices = [];
+        headBoatsSet.forEach(hBoat => {
+          const hObj = boatToCourse[hBoat];
+          if (!hObj) return;
+          const secs = secondBoatsByHead[hBoat] || new Set();
+          if (hObj.courseNo === 1) {
+            if (!secs.has(inFollowers[0].boatId)) {
+              advices.push(`⚠️ <strong>【イン逃げの抜け目警告】</strong> 1コース${hBoat}号艇のアタマを買っていますが、連対スコア1位の<strong>${inFollowers[0].boatId}号艇（${inFollowers[0].b.name}・${inFollowers[0].roleText}）</strong>が2着から抜けています。「<strong>${hBoat}-${inFollowers[0].boatId}-${inFollowers[1].boatId}</strong>」の追加を強く推奨します。`);
+            }
+          } else if (hObj.attackType === "makuri" && hObj.courseNo < 6) {
+            const outNeighbor = courseEval[hObj.courseNo + 1];
+            if (outNeighbor && !secs.has(outNeighbor.boatId)) {
+              advices.push(`🔥 <strong>【まくりスジの死角警告】</strong> ${hObj.courseNo}コース${hBoat}号艇（${hObj.b.name}）のまくり（まくり率${hObj.effMakuriRate.toFixed(1)}%）を狙っていますが、まくった際に一番展開が向く外隣<strong>${outNeighbor.courseNo}コース${outNeighbor.boatId}号艇（${outNeighbor.b.name}）</strong>が2着に入っていません！スジ舟券の鉄則として「<strong>${hBoat}-${outNeighbor.boatId}</strong>」ラインは必見です。`);
+            }
+          } else if ((hObj.attackType === "sashi" || hObj.attackType === "makurisashi") && !secs.has(inObj.boatId)) {
+            advices.push(`📐 <strong>【差し・イン残しの死角警告】</strong> ${hObj.courseNo}コース${hBoat}号艇の差し/まくり差し1着を狙っていますが、差された1コース<strong>${inObj.boatId}号艇（${inObj.b.name}）の2着残り（「${hBoat}-${inObj.boatId}」スジ）</strong>が抜けています。`);
+          }
+        });
+
+        if (userScenario === "c2_sashi" && c2Obj.effSashiRate < 10.0) {
+          advices.push(`💡 <strong>【2コース差し率チェック】</strong> 2コース差しを想定されていますが、本日の風・水面補正後の2コース差し成功率は<strong>${c2Obj.effSashiRate.toFixed(1)}%</strong>とやや低めです。3・4コースの攻め（${nonIn1.boatId}号艇）も併せて押さえると安定します。`);
+        }
+        if (userScenario === "c2_makuri" && c2Obj.effMakuriRate >= 6.0) {
+          advices.push(`🔥 <strong>【2コースジカまくり妙味】</strong> 2コース${c2Obj.boatId}号艇のまくり率は<strong>${c2Obj.effMakuriRate.toFixed(1)}%</strong>。2コースがまくると1コースが引き波に沈み、3コース<strong>${c3Obj.boatId}号艇</strong>・4コース<strong>${c4Obj.boatId}号艇</strong>の差し連動（${c2Obj.boatId}-${c3Obj.boatId}-${c4Obj.boatId}）が特大万舟スジになります！`);
+        }
+        if (advices.length === 0) {
+          advices.push(`✅ <strong>【スジ整合性◎】</strong> 狙っている1着艇の決まり手（逃げ・差し・まくり）に対して、2・3着の連動艇（外隣やイン残し・展開待ち）が的確に押さえられた完成度の高いフォーメーションです！`);
+        }
+
+        const rowsHtml = evaluatedItems.map(item => `
+          <div class="flex flex-wrap items-center justify-between bg-slate-950 border border-slate-800 px-2 py-1 rounded text-[11px] gap-1">
+            <div class="flex items-center gap-1.5">
+              <span class="font-mono font-black text-white text-xs">${item.combo}</span>
+              <span class="text-slate-400 text-[10px]">(${item.runners})</span>
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${item.sujiCls}">${item.sujiBadge}</span>
+              ${item.isAiRecommended ? '<span class="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1 rounded">AI推奨一致</span>' : ""}
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-slate-300">${item.sujiComment}</span>
+              <span class="font-mono text-sky-300 font-bold">推定 ${item.estProb.toFixed(1)}%</span>
+            </div>
+          </div>
+        `).join("");
+
+        box.innerHTML = `
+          <div class="bg-slate-950 border border-pink-500/40 rounded-lg p-2.5 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="${rankColor} font-black text-sm px-2.5 py-1 rounded shadow">総合判定 ${gradeRank}ランク (${totalScore}点 / 100点)</span>
+                <div class="text-[11px] text-slate-200">
+                  <div>入力点数: <strong>${evaluatedItems.length}点</strong> （イン逃げ ${inCount}点 ／ 非イン逆転 ${nonInCount}点）</div>
+                  <div class="text-sky-300">推定合計カバー確率: <strong>約${Math.min(89.0, sumProb).toFixed(1)}%</strong></div>
+                </div>
+              </div>
+            </div>
+            <div class="space-y-1 text-xs leading-relaxed text-slate-200">
+              ${advices.map(a => `<p>${a}</p>`).join("")}
+            </div>
+            <div class="space-y-1 max-h-[240px] overflow-y-auto pr-1 pt-1 border-t border-slate-800/80">
+              ${rowsHtml}
+            </div>
+          </div>
+        `;
       }
 
       function updateEv(idx, prob, oddsVal) {
@@ -2026,7 +2599,7 @@ def main():
     if "server_race_data" not in st.session_state:
         st.session_state["server_race_data"] = None
         st.session_state["status_banner"] = (
-            "💡 上のバーで日付・レース場・Rを選んで「🔄 公式データ自動取得」を押すと、出走表・直前情報・レースグレード(G1以上判定)が自動反映されます。"
+            "💡 上のバーで日付・レース場・Rを選んで「🔄 公式データ自動取得」を押すと、出走表・直前情報・コース別攻め成功率・レースグレード(G1以上判定)が自動反映されます。"
         )
 
     c_date, c_venue, c_rno, c_btn = st.columns([1.1, 1.8, 0.9, 2.2])
@@ -2061,7 +2634,7 @@ def main():
 
     json_payload = json.dumps(st.session_state["server_race_data"], ensure_ascii=False)
     rendered_html = ULTIMATE_HTML_TEMPLATE.replace("__INJECTED_SERVER_DATA__", json_payload)
-    components.html(rendered_html, height=1920, scrolling=True)
+    components.html(rendered_html, height=2350, scrolling=True)
 
 
 if __name__ == "__main__":
