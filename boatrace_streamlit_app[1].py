@@ -118,6 +118,55 @@ def get_active_venues_for_date(hd: str):
         return []
 
 
+def fetch_latest_odds_only(hd: str, jcd: str, rno: int) -> dict:
+    """出走表設定を保ったまま、公式の最新3連単オッズ(全120通り)と確定配当だけを再取得する"""
+    odds_map = {}
+    settled_info = None
+    session = make_official_session()
+    try:
+        odds_url = f"https://www.boatrace.jp/owpc/pc/race/odds3t?rno={rno}&jcd={jcd}&hd={hd}"
+        res_odds = session.get(odds_url, timeout=(4, 10))
+        res_odds.encoding = "utf-8"
+        soup_odds = BeautifulSoup(res_odds.text, "html.parser")
+        odds_cells = [normalize_text(td.get_text(strip=True)) for td in soup_odds.select("td.oddsPoint")]
+        if len(odds_cells) == 120:
+            for col in range(6):
+                fst = col + 1
+                col_vals = [odds_cells[row * 6 + col] for row in range(20)]
+                idx_v = 0
+                for snd in range(1, 7):
+                    if snd == fst:
+                        continue
+                    for trd in range(1, 7):
+                        if trd == fst or trd == snd:
+                            continue
+                        val_str = col_vals[idx_v]
+                        idx_v += 1
+                        if re.fullmatch(r"\d+(?:\.\d+)?", val_str):
+                            odds_map[f"{fst}-{snd}-{trd}"] = float(val_str)
+    except Exception:
+        pass
+
+    try:
+        rres_url = f"https://www.boatrace.jp/owpc/pc/race/raceresult?rno={rno}&jcd={jcd}&hd={hd}"
+        res_rres = session.get(rres_url, timeout=(4, 10))
+        res_rres.encoding = "utf-8"
+        soup_rres = BeautifulSoup(res_rres.text, "html.parser")
+        rres_txt = normalize_text(soup_rres.get_text(" ", strip=True))
+        if "データがありません" not in rres_txt:
+            pay_spans = [
+                int(re.sub(r"[^\d]", "", sp.get_text()))
+                for sp in soup_rres.select("span.is-payout1")
+                if re.sub(r"[^\d]", "", sp.get_text())
+            ]
+            if pay_spans:
+                settled_info = {"payout3t": pay_spans[0]}
+    except Exception:
+        pass
+
+    return {"odds3t": odds_map, "settledResult": settled_info}
+
+
 def detect_race_grade_from_soup(soup: BeautifulSoup) -> tuple[str, str]:
     """公式ページのヘッダークラス・タイトルからグレード(SG/PG1/G1/G2/G3/ippan)と大会名を抽出"""
     heading = soup.select_one("div.heading2_title")
@@ -542,6 +591,9 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           <button onclick="document.getElementById('weightSliderBox').classList.toggle('hidden')" class="bg-sky-700 hover:bg-sky-600 text-white font-bold px-2.5 py-1 rounded shadow">
             ⚙️ 重み付け調整(0〜200%)
           </button>
+          <button onclick="applyLearnedFeedbackParams()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-2.5 py-1 rounded shadow" title="振り返りサイトの蓄積データから重み付けと水面補正を自動最適化します">
+            🧠 振り返り学習反映
+          </button>
           <button onclick="document.getElementById('pasteImportBox').classList.toggle('hidden')" class="bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-2.5 py-1 rounded shadow">
             📥 テキスト/JSON取込
           </button>
@@ -568,6 +620,92 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
     </header>
 
     <main class="max-w-7xl mx-auto px-3 pt-3 space-y-3">
+      <!-- 🧠 振り返りデータの蓄積状況 ＆ シミュレーター自動学習フィードバックパネル -->
+      <section id="learningStatusSection" class="bg-slate-900 border-2 border-amber-500/50 rounded-xl p-3 space-y-2">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded text-xs">🧠 蓄積学習エンジン</span>
+            <h2 class="text-xs font-bold text-amber-300">振り返りデータの蓄積ステータス ＆ シミュレーター自動補正</h2>
+            <span id="learnedCountBadge" class="text-[11px] font-mono bg-slate-800 text-emerald-300 px-2 py-0.5 rounded border border-emerald-600/40">蓄積: 0レース (未反映)</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5 text-xs">
+            <button onclick="document.getElementById('quickReviewBox').classList.toggle('hidden')" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-black px-2.5 py-1 rounded shadow">
+              ➕ この場でレース結果を10秒蓄積
+            </button>
+            <button onclick="applyLearnedFeedbackParams(true)" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-2.5 py-1 rounded shadow">
+              🔄 蓄積データを再読込・適用
+            </button>
+            <button onclick="resetLearnedFeedback()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2 py-1 rounded">
+              補正オフ(初期値)
+            </button>
+          </div>
+        </div>
+        <div id="learningDetailBar" class="text-[11px] text-slate-300 bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-1.5 leading-relaxed">
+          💡 「🔬 結果振り返りサイト」で保存したレース履歴、または右上の「➕ この場でレース結果を10秒蓄積」で登録した確定結果（1Mの攻め方・道中逆転有無）が自動的にここに蓄積され、会場ごとのイン/まくり/差し/展開待ち補正と4大重み付けスライダーを自動進化させます。
+        </div>
+
+        <!-- ➕ シミュレーター画面から直接10秒で結果を蓄積できるクイック振り返りフォーム -->
+        <div id="quickReviewBox" class="hidden bg-slate-950 border border-teal-500/40 rounded-lg p-2.5 space-y-2 text-xs">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-1">
+            <span class="font-bold text-teal-300">🏁 レース結果クイック蓄積（保存すると即座に学習DBへ加算＆予想ロジックが進化します）</span>
+            <button onclick="document.getElementById('quickReviewBox').classList.add('hidden')" class="text-slate-400 hover:text-white">✕ 閉じる</button>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
+            <div>
+              <label class="block text-[10px] text-slate-400">確定 1-2-3着</label>
+              <div class="flex gap-1">
+                <select id="q_fin1" class="w-1/3 font-bold text-amber-300"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
+                <select id="q_fin2" class="w-1/3 font-bold"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
+                <select id="q_fin3" class="w-1/3 font-bold"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option></select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400">決まり手</label>
+              <select id="q_kimarite" class="w-full font-bold text-rose-300">
+                <option value="nige">🛡️ 逃げ</option><option value="sashi">📐 差し</option>
+                <option value="makuri" selected>🔥 まくり</option><option value="makurisashi">⚡ まくり差し</option><option value="nuki">🌀 抜き(道中逆転)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400">1Mの実際の攻防(トリガー)</label>
+              <select id="q_m1pat" class="w-full font-bold text-amber-200">
+                <option value="clean_in">🛡️ イン完璧先マイ</option>
+                <option value="in_flow">🌊 イン先マイ膨らみ</option>
+                <option value="c2_sashi_atk">📐 2C差し切り</option>
+                <option value="c2_makuri_atk">🔥 2Cジカまくり</option>
+                <option value="center_makuri_atk" selected>🔥 3・4Cまくり仕掛け</option>
+                <option value="center_ms_atk">⚡ 3・4Cまくり差し</option>
+                <option value="clash_wait">💥 1Mやり合い→展開待ち浮上</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400">道中(2M以降)の逆転</label>
+              <select id="q_dochu" class="w-full font-bold text-sky-200">
+                <option value="none" selected>✅ 道中逆転なし(1M通り)</option>
+                <option value="overtake_1st">🔄 1着が道中逆転(抜き)</option>
+                <option value="overtake_2nd">🔄 2着が道中逆転(競り)</option>
+                <option value="overtake_3rd">🔄 3着が道中追い上げ逆転</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400">道中逆転の要因</label>
+              <select id="q_reason" class="w-full font-bold text-emerald-200">
+                <option value="none" selected>ー (1Mスジ通り)</option>
+                <option value="turn_power">⚙️ 出足・回り足(機力)差</option>
+                <option value="2m_mistake">🌊 2Mツケマイ失敗・流れ</option>
+                <option value="racer_skill">🎓 選手の道中さばき差</option>
+              </select>
+            </div>
+            <div class="flex items-end">
+              <button onclick="saveQuickReviewFromSimulator()" class="w-full bg-teal-400 hover:bg-teal-300 text-slate-950 font-black py-1.5 rounded shadow">
+                💾 蓄積DBに追加して学習
+              </button>
+            </div>
+          </div>
+          <div id="quickAccumulatedList" class="text-[11px] text-slate-300 pt-1 border-t border-slate-800 max-h-[120px] overflow-y-auto space-y-1"></div>
+        </div>
+      </section>
+
       <!-- パネルA：予想に適用するデータの選択パネル (19項目個別ON/OFF ＆ 4種プリセット) -->
       <section id="factorSelectBox" class="bg-slate-900 border-2 border-indigo-500/40 rounded-xl p-3 space-y-2">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
@@ -872,8 +1010,30 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
                   <option value="20">フォーメーション 20点</option>
                   <option value="24">フルカバー 24点</option>
                 </select>
+                <select id="allocStrategySelect" onchange="runSimulation()" class="font-bold text-emerald-300" title="資金配分方式">
+                  <option value="prob" selected>配分:確率比例</option>
+                  <option value="ev">配分:期待値(EV)重視</option>
+                  <option value="equal_return">配分:均等払戻(ガミ防止)</option>
+                </select>
                 <input type="number" id="budgetInput" value="5000" step="100" min="400" onchange="runSimulation()" class="w-16 text-right font-mono text-amber-300" title="総軍資金(円)" />
+                <button onclick="refreshLiveOddsInBrowser()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-2 py-1 rounded text-[11px] shadow" title="現在の戦法・気配設定を保ったまま最新3連単オッズのみを再取得します">
+                  💹 オッズ更新
+                </button>
+                <button onclick="document.getElementById('oddsPasteBox').classList.toggle('hidden')" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 px-2 py-1 rounded text-[11px]" title="公式オッズ表をコピペして一括更新">
+                  📋 オッズ貼付
+                </button>
                 <button onclick="copyBetsList()" class="bg-sky-600 hover:bg-sky-500 text-white font-bold px-2 py-1 rounded text-[11px]">買い目コピー</button>
+              </div>
+            </div>
+            <div id="oddsUpdateStatus" class="hidden text-[11px] text-amber-300 bg-amber-950/60 border border-amber-600/40 rounded px-2.5 py-1"></div>
+            <div id="oddsPasteBox" class="hidden bg-slate-950 border border-amber-500/40 rounded-lg p-2 space-y-1.5 text-xs">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-amber-300 text-[11px]">📋 公式3連単オッズ表 または「1-2-3 6.8」形式のコピペ一括更新</span>
+                <button onclick="document.getElementById('oddsPasteBox').classList.add('hidden')" class="text-slate-400 hover:text-white">✕</button>
+              </div>
+              <textarea id="rawOddsPasteInput" rows="3" placeholder="BOAT RACE公式の「3連単オッズ」ページを全選択コピーして貼り付けるか、『1-2-4 8.5, 3-4-5 32.0』のように入力してください。" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs font-mono text-white"></textarea>
+              <div class="flex justify-end">
+                <button onclick="applyPastedOdds()" class="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-3 py-1 rounded text-[11px]">⚡ オッズを一括反映してEV・配分を再計算</button>
               </div>
             </div>
             <div id="copyBetsToast" class="hidden text-[11px] text-emerald-300 bg-emerald-950/70 border border-emerald-700/50 rounded px-2 py-1">
@@ -992,6 +1152,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
       let boatsData = {};
       let liveOddsMap = {};
       let settledPayoutInfo = null;
+      let learnedBias = { inModAdj: 0, makuriModAdj: 0, sashiModAdj: 0, waitBonusAdj: 0, sampleCount: 0 };
       let allDetailsOpen = false;
       let latestReportParts = { free: "", paid: "", full: "" };
       let latestSimContext = null;
@@ -1082,6 +1243,203 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         if (document.getElementById("lbl_wMotor")) document.getElementById("lbl_wMotor").textContent = `${Math.round(wm*100)}%`;
         if (document.getElementById("lbl_wSlit")) document.getElementById("lbl_wSlit").textContent = `${Math.round(ws*100)}%`;
         return { wc, we, wm, ws };
+      }
+
+
+      function rebuildLearnedParamsFromLogs(logs) {
+        if (!Array.isArray(logs) || logs.length === 0) return null;
+        const total = logs.length;
+        const nigeCnt = logs.filter(x => x.kimarite === "nige").length;
+        const m1MakuriAtkCnt = logs.filter(x => ["center_makuri_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length;
+        const sashiCnt = logs.filter(x => x.kimarite === "sashi" || x.kimarite === "makurisashi").length;
+        const dochuOvertakeCnt = logs.filter(x => x.dochuType && x.dochuType !== "none").length;
+        const turnPowerCnt = logs.filter(x => x.dochuReason === "turn_power" || x.dochuReason === "racer_skill").length;
+        const clashWaitCnt = logs.filter(x => x.firstMarkPat === "clash_wait").length;
+        const thirdMissCnt = logs.filter(x => x.missedThirdOnly).length;
+
+        const nigeRatio = nigeCnt / total;
+        const makuriRatio = m1MakuriAtkCnt / total;
+        const sashiRatio = sashiCnt / total;
+        const dochuRatio = dochuOvertakeCnt / total;
+
+        const w_course = Math.min(180, Math.max(70, Math.round((100 + (sashiRatio - 0.25) * 85 + (nigeRatio - 0.50) * 35) / 5) * 5));
+        const w_exhibit = Math.min(190, Math.max(80, Math.round((105 + dochuRatio * 55 + (turnPowerCnt / total) * 45) / 5) * 5));
+        const w_motor = Math.min(190, Math.max(80, Math.round((100 + dochuRatio * 60 + sashiRatio * 35) / 5) * 5));
+        const w_slit = Math.min(190, Math.max(80, Math.round((100 + (makuriRatio - 0.20) * 130) / 5) * 5));
+
+        const inModAdj = Math.round((nigeRatio - 0.52) * 24);
+        const makuriModAdj = Math.round((makuriRatio - 0.22) * 28);
+        const sashiModAdj = Math.round((sashiRatio - 0.24) * 26);
+        const waitBonusAdj = Math.min(22, thirdMissCnt * 5 + clashWaitCnt * 6 + dochuOvertakeCnt * 3);
+
+        const venueBiases = {};
+        const byVenue = {};
+        logs.forEach(item => {
+          const v = item.venue || "平和島";
+          if (!byVenue[v]) byVenue[v] = [];
+          byVenue[v].push(item);
+        });
+        Object.keys(byVenue).forEach(v => {
+          const list = byVenue[v];
+          const vc = list.length;
+          const vNige = list.filter(x => x.kimarite === "nige").length / vc;
+          const vMak = list.filter(x => ["center_makuri_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length / vc;
+          const vSas = list.filter(x => x.kimarite === "sashi" || x.kimarite === "makurisashi").length / vc;
+          const vWait = list.filter(x => x.missedThirdOnly || x.firstMarkPat === "clash_wait" || (x.dochuType && x.dochuType !== "none")).length;
+          venueBiases[v] = {
+            count: vc,
+            inModAdj: Math.round((vNige - 0.52) * 24),
+            makuriModAdj: Math.round((vMak - 0.22) * 28),
+            sashiModAdj: Math.round((vSas - 0.24) * 26),
+            waitBonusAdj: Math.min(22, vWait * 5)
+          };
+        });
+
+        const learnedObj = {
+          type: "BOATRACE_LEARNED_PARAMS",
+          sampleCount: total,
+          hitRate: Math.round((logs.filter(x => x.isHit).length / total) * 100),
+          dochuRate: Math.round(dochuRatio * 100),
+          weights: { w_course, w_exhibit, w_motor, w_slit },
+          bias: { inModAdj, makuriModAdj, sashiModAdj, waitBonusAdj },
+          venueBiases,
+          recentLogs: logs.slice(0, 20),
+          updatedAt: new Date().toLocaleTimeString()
+        };
+        try {
+          localStorage.setItem("BOATRACE_LEARNED_PARAMS", JSON.stringify(learnedObj));
+        } catch (e) {}
+        return learnedObj;
+      }
+
+      function saveQuickReviewFromSimulator() {
+        const vCode = document.getElementById("venueSelect").value;
+        const venue = (VENUE_MASTER[vCode] || VENUE_MASTER["04"]).name;
+        const raceNo = document.getElementById("raceNoSelect")?.value || "12";
+        const grade = document.getElementById("raceGradeSelect")?.value || "G1";
+        const f1 = Number(document.getElementById("q_fin1").value);
+        const f2 = Number(document.getElementById("q_fin2").value);
+        const f3 = Number(document.getElementById("q_fin3").value);
+        const actualCombo = `${f1}-${f2}-${f3}`;
+        const kimarite = document.getElementById("q_kimarite").value;
+        const firstMarkPat = document.getElementById("q_m1pat").value;
+        const dochuType = document.getElementById("q_dochu").value;
+        const dochuReason = document.getElementById("q_reason").value;
+
+        const aiBets = (latestSimContext?.selectedBets || []).map(b => b.combo);
+        const isHit = aiBets.includes(actualCombo);
+        const has1st2nd = aiBets.some(c => {
+          const [a, b] = c.split("-").map(Number);
+          return a === f1 && b === f2;
+        });
+
+        let logs = [];
+        try {
+          const raw = localStorage.getItem("BOATRACE_REVIEW_LOGS");
+          if (raw) logs = JSON.parse(raw);
+        } catch (e) {}
+        if (!Array.isArray(logs)) logs = [];
+
+        const kimMap = { nige: "逃げ", sashi: "差し", makuri: "まくり", makurisashi: "まくり差し", nuki: "抜き" };
+        logs.unshift({
+          venue,
+          raceNo,
+          grade,
+          actualCombo,
+          kimarite,
+          kimariteName: kimMap[kimarite] || "逃げ",
+          firstMarkPat,
+          dochuType,
+          dochuReason,
+          payout: 0,
+          invest: 4000,
+          returnYen: isHit ? 6000 : 0,
+          isHit,
+          missedThirdOnly: !isHit && has1st2nd
+        });
+
+        try {
+          localStorage.setItem("BOATRACE_REVIEW_LOGS", JSON.stringify(logs));
+        } catch (e) {}
+
+        rebuildLearnedParamsFromLogs(logs);
+        applyLearnedFeedbackParams(false);
+      }
+
+      function resetLearnedFeedback() {
+        learnedBias = { inModAdj: 0, makuriModAdj: 0, sashiModAdj: 0, waitBonusAdj: 0, sampleCount: 0 };
+        setWeightPreset(100, 100, 100, 100);
+        const badge = document.getElementById("learnedCountBadge");
+        if (badge) badge.textContent = "補正オフ (標準100%)";
+        const bar = document.getElementById("learningDetailBar");
+        if (bar) bar.innerHTML = "現在は振り返り学習補正をオフ（初期値100%）にしています。「🔄 蓄積データを再読込・適用」を押すと再度反映されます。";
+      }
+
+      function applyLearnedFeedbackParams(promptIfMissing = false) {
+        let parsed = null;
+        try {
+          const rawLogs = localStorage.getItem("BOATRACE_REVIEW_LOGS");
+          if (rawLogs) {
+            const logsArr = JSON.parse(rawLogs);
+            if (Array.isArray(logsArr) && logsArr.length > 0) {
+              parsed = rebuildLearnedParamsFromLogs(logsArr);
+            }
+          }
+          if (!parsed) {
+            const saved = localStorage.getItem("BOATRACE_LEARNED_PARAMS");
+            if (saved) parsed = JSON.parse(saved);
+          }
+        } catch (e) {}
+
+        if ((!parsed || parsed.type !== "BOATRACE_LEARNED_PARAMS") && promptIfMissing) {
+          const raw = prompt("振り返りサイトの「🧠 蓄積データから学習パラメータを生成・コピー」でコピーした学習データ(JSON)を貼り付けてください：");
+          if (raw) {
+            try {
+              parsed = JSON.parse(raw.trim());
+              localStorage.setItem("BOATRACE_LEARNED_PARAMS", JSON.stringify(parsed));
+            } catch (e) {}
+          }
+        }
+
+        if (parsed && parsed.weights) {
+          document.getElementById("w_course").value = parsed.weights.w_course ?? 100;
+          document.getElementById("w_exhibit").value = parsed.weights.w_exhibit ?? 100;
+          document.getElementById("w_motor").value = parsed.weights.w_motor ?? 100;
+          document.getElementById("w_slit").value = parsed.weights.w_slit ?? 100;
+
+          const vCode = document.getElementById("venueSelect").value;
+          const vName = (VENUE_MASTER[vCode] || VENUE_MASTER["04"]).name;
+          const vSpecific = parsed.venueBiases && parsed.venueBiases[vName];
+
+          if (vSpecific && vSpecific.count >= 1) {
+            learnedBias = { ...vSpecific, sampleCount: parsed.sampleCount || vSpecific.count, venueCount: vSpecific.count };
+          } else if (parsed.bias) {
+            learnedBias = { ...parsed.bias, sampleCount: parsed.sampleCount || 1, venueCount: 0 };
+          }
+
+          const badge = document.getElementById("learnedCountBadge");
+          if (badge) {
+            badge.textContent = `✅ 蓄積: 全${parsed.sampleCount || 1}R (${vName}:${learnedBias.venueCount || 0}R) 自動反映中`;
+          }
+          const bar = document.getElementById("learningDetailBar");
+          if (bar) {
+            bar.innerHTML = `🧠 <strong>全${parsed.sampleCount || 1}レースの振り返りデータ（道中逆転率 ${parsed.dochuRate || 0}%）を自動学習・適用中！</strong><br>` +
+              `・自動最適化された重み付け：<strong>[①コース実績:${parsed.weights.w_course}% ／ ②展示気配:${parsed.weights.w_exhibit}% ／ ③勝率・機力:${parsed.weights.w_motor}% ／ ④スリット連動:${parsed.weights.w_slit}%]</strong><br>` +
+              `・現在の水面・展開バイアス補正（${vName}）：<strong>[イン補正 ${learnedBias.inModAdj >= 0 ? "+" : ""}${learnedBias.inModAdj} ／ まくり補正 ${learnedBias.makuriModAdj >= 0 ? "+" : ""}${learnedBias.makuriModAdj} ／ 差し補正 ${learnedBias.sashiModAdj >= 0 ? "+" : ""}${learnedBias.sashiModAdj} ／ 3着展開待ち・道中浮上ボーナス +${learnedBias.waitBonusAdj}]</strong>`;
+          }
+
+          const qList = document.getElementById("quickAccumulatedList");
+          if (qList && Array.isArray(parsed.recentLogs)) {
+            qList.innerHTML = parsed.recentLogs.slice(0, 8).map((item, idx) =>
+              `<div class="flex items-center justify-between bg-slate-900 px-2 py-1 rounded border border-slate-800">` +
+              `<span>#${parsed.sampleCount - idx} <strong>${item.venue}${item.raceNo}R</strong> 確定:<strong class="text-teal-300 font-mono">${item.actualCombo}</strong> (${item.kimariteName})</span>` +
+              `<span class="text-[10px] text-amber-300">1M:${item.firstMarkPat || "-"} ／ 道中:${item.dochuType === "none" ? "1M通り" : item.dochuType}</span>` +
+              `</div>`
+            ).join("");
+          }
+
+          runSimulation();
+        }
       }
 
       function setWeightPreset(c, e, m, s) {
@@ -1401,9 +1759,9 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           courseOrder.push(Number(document.getElementById(`course_${c}`).value));
         }
 
-        const vInMod = af.env ? venue.inMod : 0;
-        const vMakuriMod = af.env ? venue.makuriMod : 0;
-        const vSashiMod = af.env ? venue.sashiMod : 0;
+        const vInMod = (af.env ? venue.inMod : 0) + (learnedBias.inModAdj || 0);
+        const vMakuriMod = (af.env ? venue.makuriMod : 0) + (learnedBias.makuriModAdj || 0);
+        const vSashiMod = (af.env ? venue.sashiMod : 0) + (learnedBias.sashiModAdj || 0);
 
         const courseEval = {};
         courseOrder.forEach((boatId, idx) => {
@@ -1475,7 +1833,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             ? Math.max(25.0, Math.min(92.0, effCourseWin + vInMod - (deepIn === "deep" ? 12 : deepIn === "semi" ? 5 : 0)))
             : Math.max(0.5, Math.min(48.0, (b.makuriRate ?? 6.0) + envMakuriAdj));
           const effMsRate = Math.max(0.5, Math.min(45.0, (b.makurisashiRate ?? 5.0) + envMsAdj));
-          const effWaitRate = Math.max(10.0, Math.min(88.0, (b.waitRentaiRate ?? 42.0) + (b.visTurn * 3.5)));
+          const effWaitRate = Math.max(10.0, Math.min(88.0, (b.waitRentaiRate ?? 42.0) + (b.visTurn * 3.5) + (courseNo >= 4 ? (learnedBias.waitBonusAdj || 0) : 0)));
 
           const kimariteFirstBonus = af.courseKimarite
             ? (courseNo === 1 ? effMakuriRate * 0.18 : (effSashiRate * 0.42 + effMakuriRate * 0.52 + effMsRate * 0.48)) * cw.wc
@@ -2105,8 +2463,18 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           selectedBets: bets
         };
 
-        const totalProb = bets.reduce((s, x) => s + x.prob, 0);
-        const allocs = bets.map(x => Math.max(100, Math.round(((x.prob / totalProb) * budget) / 100) * 100));
+        const allocStrategy = document.getElementById("allocStrategySelect")?.value || "prob";
+        const weightsForAlloc = bets.map(x => {
+          if (allocStrategy === "ev") {
+            const evVal = (x.prob / 100) * (x.odds || 10);
+            return Math.max(0.1, x.prob * (evVal >= 1.05 ? 1.8 : 0.7));
+          } else if (allocStrategy === "equal_return") {
+            return 1.0 / Math.max(1.5, x.odds || 10.0);
+          }
+          return x.prob;
+        });
+        const totalWeight = weightsForAlloc.reduce((s, w) => s + w, 0) || 1;
+        const allocs = weightsForAlloc.map(w => Math.max(100, Math.round(((w / totalWeight) * budget) / 100) * 100));
         let sumAlloc = allocs.reduce((a, b) => a + b, 0);
         let k = 0;
         while (sumAlloc !== budget && k < 200) {
@@ -2136,7 +2504,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
               </div>
               <div class="flex items-center gap-1.5">
                 <span class="text-[10px] text-slate-400">オッズ</span>
-                <input type="number" step="0.1" value="${b.odds}" oninput="updateEv(${idx},${b.prob},this.value)" class="w-14 text-right font-mono" />
+                <input type="number" step="0.1" value="${b.odds}" onchange="updateEv(${idx},${b.prob},this.value,'${b.combo}',true)" oninput="updateEv(${idx},${b.prob},this.value,'${b.combo}',false)" class="w-14 text-right font-mono text-amber-200 font-bold" />
                 <span id="ev_badge_${idx}" class="text-[10px] font-bold px-1.5 py-0.5 rounded ${plus ? "bg-amber-500 text-slate-950" : "bg-slate-800 text-slate-400"}">EV ${ev}%${plus ? " ★" : ""}</span>
               </div>
             </div>`;
@@ -2425,10 +2793,14 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           sumFitScore += itemScore;
           sumProb += estProb;
 
+          const itemOdds = liveOddsMap[combo] || (aiHit ? aiHit.odds : Math.round((100 / Math.max(0.8, estProb)) * 0.75 * 10) / 10);
+          const itemEv = Math.round((estProb / 100) * itemOdds * 100);
           return {
             combo,
             runners: `${nameOf(b1)}→${nameOf(b2)}→${nameOf(b3)}`,
             estProb,
+            itemOdds,
+            itemEv,
             sujiBadge,
             sujiCls,
             itemScore,
@@ -2485,7 +2857,9 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-[10px] text-slate-300">${item.sujiComment}</span>
-              <span class="font-mono text-sky-300 font-bold">推定 ${item.estProb.toFixed(1)}%</span>
+              <span class="font-mono text-sky-300 font-bold">確率 ${item.estProb.toFixed(1)}%</span>
+              <span class="font-mono text-amber-300">オッズ ${item.itemOdds.toFixed(1)}倍</span>
+              <span class="font-mono px-1.5 py-0.5 rounded text-[10px] font-bold ${item.itemEv >= 105 ? "bg-amber-400 text-slate-950" : "bg-slate-800 text-slate-400"}">EV ${item.itemEv}%</span>
             </div>
           </div>
         `).join("");
@@ -2511,12 +2885,141 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         `;
       }
 
-      function updateEv(idx, prob, oddsVal) {
-        const ev = Math.round((prob / 100) * (parseFloat(oddsVal) || 0) * 100);
+      function updateEv(idx, prob, oddsVal, comboKey = "", triggerRealloc = false) {
+        const parsedOdds = parseFloat(oddsVal) || 0;
+        if (comboKey && parsedOdds > 0) {
+          liveOddsMap[comboKey] = parsedOdds;
+        }
+        const ev = Math.round((prob / 100) * parsedOdds * 100);
         const badge = document.getElementById(`ev_badge_${idx}`);
-        const plus = ev >= 105;
-        badge.className = `text-[10px] font-bold px-1.5 py-0.5 rounded ${plus ? "bg-amber-500 text-slate-950" : "bg-slate-800 text-slate-400"}`;
-        badge.textContent = `EV ${ev}%${plus ? " ★" : ""}`;
+        if (badge) {
+          const plus = ev >= 105;
+          badge.className = `text-[10px] font-bold px-1.5 py-0.5 rounded ${plus ? "bg-amber-500 text-slate-950" : "bg-slate-800 text-slate-400"}`;
+          badge.textContent = `EV ${ev}%${plus ? " ★" : ""}`;
+        }
+        if (triggerRealloc) {
+          runSimulation();
+        } else {
+          evaluateUserPredictions();
+        }
+      }
+
+      async function refreshLiveOddsInBrowser() {
+        const vCode = document.getElementById("venueSelect").value || "04";
+        const rno = document.getElementById("raceNoSelect").value || "12";
+        const now = new Date();
+        const hd = INITIAL_SERVER_DATA?.meta?.hd || `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+        const statusEl = document.getElementById("oddsUpdateStatus");
+        if (statusEl) {
+          statusEl.classList.remove("hidden");
+          statusEl.textContent = `⏳ BOAT RACE公式から ${hd} 場コード:${vCode} ${rno}R の最新3連単オッズを取得中...`;
+        }
+
+        const targetUrl = `https://www.boatrace.jp/owpc/pc/race/odds3t?rno=${rno}&jcd=${vCode}&hd=${hd}`;
+        const proxies = [
+          (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+          (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+        ];
+        let htmlTxt = null;
+        for (const makeUrl of proxies) {
+          try {
+            const res = await fetch(makeUrl(targetUrl));
+            if (res.ok) {
+              const t = await res.text();
+              if (t && t.includes("oddsPoint")) {
+                htmlTxt = t;
+                break;
+              }
+            }
+          } catch (e) {}
+        }
+
+        if (!htmlTxt) {
+          if (statusEl) {
+            statusEl.textContent = `💡 ブラウザ直接通信がブロックされたため、画面最上部の「💹 最新オッズのみ更新」ボタンを押すか「📋 オッズ貼付」をご利用ください。`;
+          }
+          return;
+        }
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlTxt, "text/html");
+        const cells = Array.from(doc.querySelectorAll("td.oddsPoint")).map(td => td.textContent.trim());
+        let updatedCount = 0;
+        if (cells.length === 120) {
+          for (let col = 0; col < 6; col++) {
+            const fst = col + 1;
+            const colVals = [];
+            for (let row = 0; row < 20; row++) colVals.push(cells[row * 6 + col]);
+            let idxV = 0;
+            for (let snd = 1; snd <= 6; snd++) {
+              if (snd === fst) continue;
+              for (let trd = 1; trd <= 6; trd++) {
+                if (trd === fst || trd === snd) continue;
+                const val = parseFloat(colVals[idxV]);
+                idxV++;
+                if (Number.isFinite(val) && val > 0) {
+                  liveOddsMap[`${fst}-${snd}-${trd}`] = val;
+                  updatedCount++;
+                }
+              }
+            }
+          }
+        }
+        if (statusEl) {
+          statusEl.textContent = `✅ 最新3連単オッズ（${updatedCount}通り / ${new Date().toLocaleTimeString()}時点）を更新し、EV・配分を再計算しました！`;
+        }
+        runSimulation();
+      }
+
+      function applyPastedOdds() {
+        const raw = (document.getElementById("rawOddsPasteInput")?.value || "").trim();
+        if (!raw) return;
+        let cnt = 0;
+
+        // 1. 「1-2-3 6.8」や「1-2-3: 12.4」形式の直接ペア抽出
+        const pairMatches = [...raw.matchAll(/([1-6])\s*[-=]\s*([1-6])\s*[-=]\s*([1-6])[^\d
+]{1,15}(\d+\.\d+)/g)];
+        pairMatches.forEach(m => {
+          const combo = `${m[1]}-${m[2]}-${m[3]}`;
+          const val = parseFloat(m[4]);
+          if (val > 0) {
+            liveOddsMap[combo] = val;
+            cnt++;
+          }
+        });
+
+        // 2. 公式3連単オッズ表全文コピペ（120個の小数）の場合
+        if (cnt < 6) {
+          const allFloats = [...raw.matchAll(/(\d{1,4}\.\d)/g)].map(m => parseFloat(m[1]));
+          if (allFloats.length >= 120) {
+            const cells = allFloats.slice(0, 120);
+            for (let col = 0; col < 6; col++) {
+              const fst = col + 1;
+              const colVals = [];
+              for (let row = 0; row < 20; row++) colVals.push(cells[row * 6 + col]);
+              let idxV = 0;
+              for (let snd = 1; snd <= 6; snd++) {
+                if (snd === fst) continue;
+                for (let trd = 1; trd <= 6; trd++) {
+                  if (trd === fst || trd === snd) continue;
+                  const val = colVals[idxV++];
+                  if (Number.isFinite(val) && val > 0) {
+                    liveOddsMap[`${fst}-${snd}-${trd}`] = val;
+                    cnt++;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        const statusEl = document.getElementById("oddsUpdateStatus");
+        if (statusEl) {
+          statusEl.classList.remove("hidden");
+          statusEl.textContent = `✅ 貼り付けテキストから ${cnt} 件の3連単オッズを反映しました！`;
+        }
+        document.getElementById("oddsPasteBox").classList.add("hidden");
+        runSimulation();
       }
 
       function copyBetsList() {
@@ -2561,6 +3064,12 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         if (raw.startsWith("[") || raw.startsWith("{")) {
           try {
             const parsed = JSON.parse(raw);
+            if (parsed.type === "BOATRACE_LEARNED_PARAMS" && parsed.weights) {
+              localStorage.setItem("BOATRACE_LEARNED_PARAMS", JSON.stringify(parsed));
+              applyLearnedFeedbackParams();
+              document.getElementById("pasteImportBox").classList.add("hidden");
+              return;
+            }
             const arr = Array.isArray(parsed) ? parsed : Object.values(parsed.boats || parsed);
             arr.slice(0, 6).forEach((item, idx) => {
               const b = idx + 1;
@@ -2632,6 +3141,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
       window.addEventListener("DOMContentLoaded", () => {
         initCourseSelectors();
         loadHeiwajimaPreset();
+        applyLearnedFeedbackParams(false);
         if (INITIAL_SERVER_DATA && INITIAL_SERVER_DATA.status === "ok") {
           applyServerData(INITIAL_SERVER_DATA);
         }
@@ -2850,11 +3360,58 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
                       <th class="py-1 text-center">事前/展示ST</th>
                       <th class="py-1 text-center text-teal-300">本番実ST</th>
                       <th class="py-1 text-center">ST変化</th>
-                      <th class="py-1 text-center">確定着順</th>
+                      <th class="py-1 text-center text-amber-300">1Mの実際の攻め/動き</th>
+                      <th class="py-1 text-center text-sky-300">1M出口順</th>
+                      <th class="py-1 text-center text-teal-300">確定着順</th>
                     </tr>
                   </thead>
                   <tbody id="boatStInputTable" class="divide-y divide-slate-800/60"></tbody>
                 </table>
+              </div>
+            </div>
+
+            <!-- 🌀 新設：1周1マークの実際の攻防プロセス ＆ 道中（2M以降）の逆転・推移 -->
+            <div class="pt-2.5 border-t border-slate-800 space-y-2">
+              <div class="flex flex-wrap items-center justify-between gap-1">
+                <span class="text-[11px] font-bold text-amber-300">🌀 1マークの実際の攻防プロセス ＆ 道中逆転（映像なし・数値逆算エンジン搭載）</span>
+                <button onclick="infer1MProcessFromNumbers(true)" class="text-[10px] bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2 py-0.5 rounded shadow">
+                  🤖 ST差×着順×タイムから1M攻防＆道中逆転を自動逆算
+                </button>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <div>
+                  <label class="block text-slate-400 text-[10px]">① 1マークの展開トリガー(実際の攻防)</label>
+                  <select id="firstMarkPattern" onchange="runReviewAnalysis()" class="w-full font-bold text-amber-200">
+                    <option value="clean_in">🛡️ インが完璧先マイ・壁機能</option>
+                    <option value="in_flow">🌊 インが先マイもターン膨らみ/流れ</option>
+                    <option value="c2_sashi_atk">📐 2コースが鋭く差し切り/肉薄</option>
+                    <option value="c2_makuri_atk">🔥 2コースがジカまくり仕掛け</option>
+                    <option value="center_makuri_atk" selected>🔥 3・4コースがまくり仕掛け(内被弾)</option>
+                    <option value="center_ms_atk">⚡ 3・4コースがまくり差し突き抜け</option>
+                    <option value="clash_wait">💥 1Mで内と攻め艇がやり合い(展開待ち浮上)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-slate-400 text-[10px]">② 道中（1周2M以降）の着順変動・逆転</label>
+                  <select id="dochuOvertakeType" onchange="runReviewAnalysis()" class="w-full font-bold text-sky-200">
+                    <option value="none" selected>✅ 1M出口隊形のまま確定(道中逆転なし)</option>
+                    <option value="overtake_1st">🔄 1着が道中逆転(2M差し返し・抜き)</option>
+                    <option value="overtake_2nd">🔄 2着が道中逆転(2番手競り・2M逆転)</option>
+                    <option value="overtake_3rd">🔄 3着が道中逆転(道中追い上げ・3番手逆転)</option>
+                    <option value="overtake_both">🔄 2・3着ともに道中で入れ替わり(混戦)</option>
+                    <option value="accident">⚠️ キャビり・不良航法・転覆等で変動</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-slate-400 text-[10px]">③ 道中逆転・浮上の主な要因</label>
+                  <select id="dochuReason" onchange="runReviewAnalysis()" class="w-full font-bold text-emerald-200">
+                    <option value="none" selected>ー (1Mスジ通り決着)</option>
+                    <option value="turn_power">⚙️ 出足・回り足(周回気配・機力)の圧倒的差</option>
+                    <option value="2m_mistake">🌊 2マークで先行艇がツケマイ失敗・流れ</option>
+                    <option value="racer_skill">🎓 選手の道中さばき・実力(G1勝率)差</option>
+                    <option value="bad_water">💨 波・うねり・強風でのターン乱れ</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -2970,7 +3527,16 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
                 <h2 class="text-xs font-bold text-emerald-400">📈 ⑦ 累計レース振り返り履歴 ＆ 収支・弱点傾向サマリー</h2>
                 <span id="logStatsSummary" class="text-[11px] font-mono text-slate-300">保存履歴: 0件</span>
               </div>
-              <button onclick="clearReviewLogs()" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-0.5 rounded">履歴クリア</button>
+              <div class="flex items-center gap-1.5">
+                <button onclick="exportLearnedParamsToSimulator()" class="text-[11px] bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2.5 py-1 rounded shadow">
+                  🧠 蓄積データから学習パラメータを生成・コピー
+                </button>
+                <button onclick="clearReviewLogs()" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-0.5 rounded">履歴クリア</button>
+              </div>
+            </div>
+            <div id="learnedFeedbackBanner" class="bg-indigo-950/70 border border-indigo-500/40 rounded-lg p-2 text-[11px] text-indigo-200 space-y-1">
+              <div class="font-bold text-amber-300">🧠 蓄積データ自動学習ステータス（シミュレーター連携）</div>
+              <div id="learnedParamsPreview">レース履歴を保存すると、決まり手傾向・STズレ・3着抜けパターンを統計処理し、予想シミュレーター用の最適パラメータを自動算出します。</div>
             </div>
             <div id="reviewLogsContainer" class="space-y-1.5 max-h-[220px] overflow-y-auto text-xs"></div>
           </div>
@@ -3018,13 +3584,16 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           document.getElementById("hitTicketYen").value = "500";
           document.getElementById("preBetsInput").value = "1-2-4, 1-4-2, 4-5-1, 4-1-5, 4-5-2, 3-4-5";
 
+          document.getElementById("firstMarkPattern").value = "center_makuri_atk";
+          document.getElementById("dochuOvertakeType").value = "overtake_3rd";
+          document.getElementById("dochuReason").value = "turn_power";
           reviewBoats = {
-            1: { id: 1, course: 1, name: "白井 英治", exTime: 6.75, preSt: 0.11, actualSt: 0.14, rank: 3 },
-            2: { id: 2, course: 2, name: "瓜生 正義", exTime: 6.79, preSt: 0.14, actualSt: 0.16, rank: 4 },
-            3: { id: 3, course: 3, name: "澤田 尚也", exTime: 6.77, preSt: 0.14, actualSt: 0.21, rank: 5 },
-            4: { id: 4, course: 4, name: "大峯 豊", exTime: 6.71, preSt: 0.12, actualSt: 0.08, rank: 1 },
-            5: { id: 5, course: 5, name: "篠崎 仁志", exTime: 6.75, preSt: 0.13, actualSt: 0.11, rank: 2 },
-            6: { id: 6, course: 6, name: "吉田 裕平", exTime: 6.82, preSt: 0.15, actualSt: 0.15, rank: 6 }
+            1: { id: 1, course: 1, name: "白井 英治", exTime: 6.75, preSt: 0.11, actualSt: 0.14, m1Action: "被弾・残し", m1Rank: 4, rank: 3 },
+            2: { id: 2, course: 2, name: "瓜生 正義", exTime: 6.79, preSt: 0.14, actualSt: 0.16, m1Action: "引き波被弾", m1Rank: 5, rank: 4 },
+            3: { id: 3, course: 3, name: "澤田 尚也", exTime: 6.77, preSt: 0.14, actualSt: 0.21, m1Action: "凹み・壁崩壊", m1Rank: 6, rank: 5 },
+            4: { id: 4, course: 4, name: "大峯 豊", exTime: 6.71, preSt: 0.12, actualSt: 0.08, m1Action: "まくり敢行", m1Rank: 1, rank: 1 },
+            5: { id: 5, course: 5, name: "篠崎 仁志", exTime: 6.75, preSt: 0.13, actualSt: 0.11, m1Action: "まくり差し連動", m1Rank: 2, rank: 2 },
+            6: { id: 6, course: 6, name: "吉田 裕平", exTime: 6.82, preSt: 0.15, actualSt: 0.15, m1Action: "展開待ち最内", m1Rank: 3, rank: 6 }
           };
         } else if (mode === "sashi_miss") {
           document.getElementById("revVenue").value = "福岡";
@@ -3045,13 +3614,16 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           document.getElementById("hitTicketYen").value = "400";
           document.getElementById("preBetsInput").value = "1-2-3, 1-2-4, 1-3-2, 1-3-4, 1-4-2, 1-4-3";
 
+          document.getElementById("firstMarkPattern").value = "c2_sashi_atk";
+          document.getElementById("dochuOvertakeType").value = "none";
+          document.getElementById("dochuReason").value = "none";
           reviewBoats = {
-            1: { id: 1, course: 1, name: "峰 竜太", exTime: 6.78, preSt: 0.12, actualSt: 0.13, rank: 2 },
-            2: { id: 2, course: 2, name: "毒島 誠", exTime: 6.74, preSt: 0.13, actualSt: 0.11, rank: 1 },
-            3: { id: 3, course: 3, name: "馬場 貴也", exTime: 6.76, preSt: 0.14, actualSt: 0.14, rank: 4 },
-            4: { id: 4, course: 4, name: "桐生 順平", exTime: 6.79, preSt: 0.15, actualSt: 0.16, rank: 5 },
-            5: { id: 5, course: 5, name: "茅原 悠紀", exTime: 6.75, preSt: 0.14, actualSt: 0.13, rank: 3 },
-            6: { id: 6, course: 6, name: "池田 浩二", exTime: 6.81, preSt: 0.16, actualSt: 0.17, rank: 6 }
+            1: { id: 1, course: 1, name: "峰 竜太", exTime: 6.78, preSt: 0.12, actualSt: 0.13, m1Action: "先マイ膨らみ", m1Rank: 2, rank: 2 },
+            2: { id: 2, course: 2, name: "毒島 誠", exTime: 6.74, preSt: 0.13, actualSt: 0.11, m1Action: "1M差し抜け", m1Rank: 1, rank: 1 },
+            3: { id: 3, course: 3, name: "馬場 貴也", exTime: 6.76, preSt: 0.14, actualSt: 0.14, m1Action: "外マイ流れ", m1Rank: 4, rank: 4 },
+            4: { id: 4, course: 4, name: "桐生 順平", exTime: 6.79, preSt: 0.15, actualSt: 0.16, m1Action: "差し届かず", m1Rank: 5, rank: 5 },
+            5: { id: 5, course: 5, name: "茅原 悠紀", exTime: 6.75, preSt: 0.14, actualSt: 0.13, m1Action: "展開待ち最内", m1Rank: 3, rank: 3 },
+            6: { id: 6, course: 6, name: "池田 浩二", exTime: 6.81, preSt: 0.16, actualSt: 0.17, m1Action: "展開待ち", m1Rank: 6, rank: 6 }
           };
         } else {
           document.getElementById("revVenue").value = "大村";
@@ -3072,13 +3644,16 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           document.getElementById("hitTicketYen").value = "1000";
           document.getElementById("preBetsInput").value = "1-2-4, 1-4-2, 1-2-3, 1-3-2";
 
+          document.getElementById("firstMarkPattern").value = "clean_in";
+          document.getElementById("dochuOvertakeType").value = "none";
+          document.getElementById("dochuReason").value = "none";
           reviewBoats = {
-            1: { id: 1, course: 1, name: "白井 英治", exTime: 6.72, preSt: 0.11, actualSt: 0.09, rank: 1 },
-            2: { id: 2, course: 2, name: "瓜生 正義", exTime: 6.76, preSt: 0.13, actualSt: 0.12, rank: 2 },
-            3: { id: 3, course: 3, name: "澤田 尚也", exTime: 6.79, preSt: 0.14, actualSt: 0.15, rank: 4 },
-            4: { id: 4, course: 4, name: "大峯 豊", exTime: 6.74, preSt: 0.13, actualSt: 0.12, rank: 3 },
-            5: { id: 5, course: 5, name: "篠崎 仁志", exTime: 6.80, preSt: 0.15, actualSt: 0.15, rank: 5 },
-            6: { id: 6, course: 6, name: "吉田 裕平", exTime: 6.82, preSt: 0.16, actualSt: 0.17, rank: 6 }
+            1: { id: 1, course: 1, name: "白井 英治", exTime: 6.72, preSt: 0.11, actualSt: 0.09, m1Action: "先マイ逃走", m1Rank: 1, rank: 1 },
+            2: { id: 2, course: 2, name: "瓜生 正義", exTime: 6.76, preSt: 0.13, actualSt: 0.12, m1Action: "差し追走", m1Rank: 2, rank: 2 },
+            3: { id: 3, course: 3, name: "澤田 尚也", exTime: 6.79, preSt: 0.14, actualSt: 0.15, m1Action: "外マイ", m1Rank: 4, rank: 4 },
+            4: { id: 4, course: 4, name: "大峯 豊", exTime: 6.74, preSt: 0.13, actualSt: 0.12, m1Action: "二番差し", m1Rank: 3, rank: 3 },
+            5: { id: 5, course: 5, name: "篠崎 仁志", exTime: 6.80, preSt: 0.15, actualSt: 0.15, m1Action: "展開待ち", m1Rank: 5, rank: 5 },
+            6: { id: 6, course: 6, name: "吉田 裕平", exTime: 6.82, preSt: 0.16, actualSt: 0.17, m1Action: "最内差し", m1Rank: 6, rank: 6 }
           };
         }
 
@@ -3233,9 +3808,103 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         const windM = fullText.match(/風速\s*(\d+)\s*m/);
         if (windM) document.getElementById("actualWindSpeed").value = parseInt(windM[1], 10);
 
+        infer1MProcessFromNumbers(false);
         renderBoatStTable();
         runReviewAnalysis();
         msgEl.textContent = `✅ 公式結果＆配当を自動反映しました！（確定: ${document.getElementById("fin1").value}-${document.getElementById("fin2").value}-${document.getElementById("fin3").value} ／ 3連単 ${Number(document.getElementById("payoutYen").value).toLocaleString()}円）`;
+      }
+
+
+      function infer1MProcessFromNumbers(triggerRun = true) {
+        const f1 = Number(document.getElementById("fin1").value);
+        const f2 = Number(document.getElementById("fin2").value);
+        const f3 = Number(document.getElementById("fin3").value);
+        const kim = document.getElementById("actualKimarite").value;
+        const arr = Object.values(reviewBoats);
+        if (arr.length < 6) return;
+
+        // 1. 本番STと着順の乖離から「仕掛け不発（やり合い）」「壁崩壊」「引き波被弾」を数値逆算
+        const c1 = arr.find(x => x.course === 1) || reviewBoats[1];
+        const c2 = arr.find(x => x.course === 2) || reviewBoats[2];
+        const c3 = arr.find(x => x.course === 3) || reviewBoats[3];
+        const c4 = arr.find(x => x.course === 4) || reviewBoats[4];
+        const wBoat = reviewBoats[f1];
+
+        // センター勢がST踏み込んだのに4〜6着に沈み、差し・まくり差し決着になった場合＝「1Mやり合い（抵抗）発生」
+        const centerChargedAndSank = [c3, c4].some(x => x && x.actualSt <= c1.actualSt - 0.02 && x.rank >= 4 && c1.rank >= 3);
+
+        if (kim === "nige") {
+          document.getElementById("firstMarkPattern").value = "clean_in";
+        } else if (kim === "sashi" && wBoat?.course === 2) {
+          document.getElementById("firstMarkPattern").value = c1.rank === 2 ? "in_flow" : "c2_sashi_atk";
+        } else if (kim === "makuri" && wBoat?.course === 2) {
+          document.getElementById("firstMarkPattern").value = "c2_makuri_atk";
+        } else if (centerChargedAndSank) {
+          document.getElementById("firstMarkPattern").value = "clash_wait";
+        } else if (kim === "makuri") {
+          document.getElementById("firstMarkPattern").value = "center_makuri_atk";
+        } else if (kim === "makurisashi") {
+          document.getElementById("firstMarkPattern").value = "center_ms_atk";
+        } else if (kim === "nuki") {
+          document.getElementById("firstMarkPattern").value = "in_flow";
+        }
+
+        // 2. 道中逆転の自動推論（決まり手が「抜き」または展示時計上位艇がスジ外から2・3着に食い込んだ場合）
+        if (kim === "nuki") {
+          document.getElementById("dochuOvertakeType").value = "overtake_1st";
+          document.getElementById("dochuReason").value = "turn_power";
+        } else {
+          const b3Obj = reviewBoats[f3];
+          const exSorted = [...arr].sort((a, b) => a.exTime - b.exTime);
+          if (b3Obj && (b3Obj.exTime <= exSorted[1].exTime || b3Obj.course === 1 && kim === "makuri")) {
+            document.getElementById("dochuOvertakeType").value = "overtake_3rd";
+            document.getElementById("dochuReason").value = "turn_power";
+          } else {
+            document.getElementById("dochuOvertakeType").value = "none";
+            document.getElementById("dochuReason").value = "none";
+          }
+        }
+
+        // 3. 6艇それぞれの1Mアクションと1M出口順位をST・コース・確定着順から自動推定
+        arr.forEach(d => {
+          const prevCourseBoat = arr.find(x => x.course === d.course - 1);
+          const isDoka = d.actualSt >= 0.19 || (prevCourseBoat && d.actualSt - prevCourseBoat.actualSt >= 0.04);
+
+          if (d.id === f1) {
+            if (kim === "nige") d.m1Action = "先マイ逃走";
+            else if (kim === "makuri") d.m1Action = "まくり敢行";
+            else if (kim === "makurisashi") d.m1Action = "まくり差し連動";
+            else if (kim === "sashi") d.m1Action = "1M差し抜け";
+            else d.m1Action = "差し追走";
+            d.m1Rank = kim === "nuki" ? 2 : 1;
+          } else if (isDoka && d.rank >= 4) {
+            d.m1Action = "凹み・壁崩壊";
+            d.m1Rank = d.rank;
+          } else if (d.course >= 3 && d.actualSt <= c1.actualSt - 0.02 && d.rank >= 4) {
+            d.m1Action = "まくり不発(抵抗被弾)";
+            d.m1Rank = 4;
+          } else if (d.course === 1 && d.rank >= 2) {
+            d.m1Action = kim === "makuri" ? "引き波被弾" : "先マイ膨らみ";
+            d.m1Rank = kim === "nuki" ? 1 : (kim === "makuri" && d.rank === 3 ? 4 : d.rank);
+          } else if (d.rank <= 3) {
+            if (d.course >= 5 || (kim === "makuri" && d.course > wBoat.course + 1)) {
+              d.m1Action = "展開待ち最内";
+            } else if (kim === "makuri" && d.course === wBoat.course + 1) {
+              d.m1Action = "まくり差し連動";
+            } else if (d.course === 2) {
+              d.m1Action = "差し追走";
+            } else {
+              d.m1Action = "二番差し";
+            }
+            d.m1Rank = d.rank;
+          } else {
+            d.m1Action = d.course < (wBoat?.course || 1) ? "引き波被弾" : "外マイ";
+            d.m1Rank = d.rank;
+          }
+        });
+
+        renderBoatStTable();
+        if (triggerRun) runReviewAnalysis();
       }
 
       function renderBoatStTable() {
@@ -3259,7 +3928,13 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
             <td class="py-1 text-center"><input type="number" step="0.01" value="${d.preSt.toFixed(2)}" onchange="updateRevBoat(${b},'preSt',parseFloat(this.value))" class="w-14 text-center font-mono text-slate-300" /></td>
             <td class="py-1 text-center"><input type="number" step="0.01" value="${d.actualSt.toFixed(2)}" onchange="updateRevBoat(${b},'actualSt',parseFloat(this.value))" class="w-14 text-center font-mono text-teal-300 font-bold" /></td>
             <td class="py-1 text-center font-mono text-[10px] ${diffCls}">${diffStr} (${diffLabel})</td>
-            <td class="py-1 text-center"><input type="number" min="1" max="6" value="${d.rank}" onchange="updateRevBoat(${b},'rank',parseInt(this.value,10))" class="w-11 text-center font-bold" /></td>
+            <td class="py-1 text-center">
+              <select onchange="updateRevBoat(${b},'m1Action',this.value)" class="text-[10px] py-0.5 px-1 text-amber-200">
+                ${["先マイ逃走","先マイ膨らみ","まくり敢行","まくり不発(抵抗被弾)","まくり差し連動","1M差し抜け","差し追走","二番差し","外マイ","展開待ち最内","引き波被弾","凹み・壁崩壊"].map(act => `<option value="${act}" ${(d.m1Action || "差し追走") === act ? "selected" : ""}>${act}</option>`).join("")}
+              </select>
+            </td>
+            <td class="py-1 text-center"><input type="number" min="1" max="6" value="${d.m1Rank ?? d.rank}" onchange="updateRevBoat(${b},'m1Rank',parseInt(this.value,10))" class="w-10 text-center font-bold text-sky-300" title="1周1M出口時点の順位" /></td>
+            <td class="py-1 text-center"><input type="number" min="1" max="6" value="${d.rank}" onchange="updateRevBoat(${b},'rank',parseInt(this.value,10))" class="w-10 text-center font-bold text-teal-300" title="最終確定着順" /></td>
           </tr>`;
         }
       }
@@ -3416,17 +4091,34 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           reflectionAdvice = `🔍 <strong>【展開逆行の原因解剖】</strong> 事前は「${preScenario === "nige" ? "イン逃げ本線" : "別展開"}」を想定していましたが、本番は<strong>${dokaText}</strong>したことでスリット隊形が一変し、<strong>${f1}号艇の「${kimariteName}」</strong>が決まりました。${windDir}${windSpeed}mの水面条件と壁役の信頼度を再点検する必要があります。`;
         }
 
+        const m1Sorted = [...boatsArr].sort((a, b) => (a.m1Rank ?? a.rank) - (b.m1Rank ?? b.rank));
+        const m1Combo = `${m1Sorted[0].id}-${m1Sorted[1].id}-${m1Sorted[2].id}`;
+        const isM1Hit = userBets.includes(m1Combo);
+        const firstMarkPat = document.getElementById("firstMarkPattern")?.value || "clean_in";
+        const dochuType = document.getElementById("dochuOvertakeType")?.value || "none";
+        const dochuReason = document.getElementById("dochuReason")?.value || "none";
+
+        const dochuChangedBoats = boatsArr.filter(x => (x.m1Rank ?? x.rank) !== x.rank);
+        const dochuSummaryText = (dochuType === "none" && m1Combo === actualCombo)
+          ? `1周1マーク出口隊形 <strong>[${m1Combo}]</strong> のまま道中逆転なく確定（純粋な1Mスジ決着）。`
+          : `1周1マーク出口時点では <strong>[${m1Combo}]</strong> でしたが、道中（1周2M以降）で <strong>[${actualCombo}]</strong> へ着順が入れ替わりました（${dochuChangedBoats.map(x => `${x.id}号艇:${x.m1Rank ?? x.rank}番手→${x.rank}着`).join(" / ")}）。${isM1Hit && !isHit ? "<span class=\"text-amber-300 font-bold\">★あなたの事前買い目は『1マーク出口時点では的中』していたため、1M展開読み自体は正解です！道中の機力（出足・回り足）差のみ補正します。</span>" : ""}`;
+
         document.getElementById("retrospectiveDetailBox").innerHTML = `
           <div class="space-y-1 border-b border-slate-800 pb-2">
             <div class="text-teal-300 font-bold">① スリット（展示ST vs 本番実ST）のズレ診断</div>
             <p>トップスタートは<strong>${topStBoat.course}コース${topStBoat.id}号艇（${topStBoat.name} / 実ST .${Math.round(topStBoat.actualSt*100).toString().padStart(2,"0")}）</strong>。全体としては「${dokaText}」というスリット結果でした。</p>
           </div>
           <div class="space-y-1 border-b border-slate-800 pb-2">
-            <div class="text-amber-300 font-bold">② 1マーク決まり手（${kimariteName}）＆ 2・3着スジ連動の解剖</div>
+            <div class="text-amber-300 font-bold">② 1マーク実際の攻め方 ＆ 1M出口隊形 [${m1Combo}] の解剖</div>
+            <p>各艇の1Mアクション：<strong>${boatsArr.map(x => `${x.course}C(${x.id}):${x.m1Action || "追走"}`).join(" ／ ")}</strong></p>
             <p>${why2nd3rdText}</p>
           </div>
+          <div class="space-y-1 border-b border-slate-800 pb-2">
+            <div class="text-sky-300 font-bold">③ 道中（1周2M〜3周）の逆転・着順変動の分離評価</div>
+            <p>${dochuSummaryText}</p>
+          </div>
           <div class="space-y-1">
-            <div class="text-pink-300 font-bold">③ あなたの事前予想（${userBets.length}点）に対する答え合わせ結論</div>
+            <div class="text-pink-300 font-bold">④ あなたの事前予想（${userBets.length}点）に対する答え合わせ結論</div>
             <p>${reflectionAdvice}</p>
           </div>
         `;
@@ -3527,22 +4219,149 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         const isHit = userBets.includes(actualCombo);
         const returnYen = isHit ? Math.round((payout / 100) * hitUnitYen) : 0;
 
+        const has1st2nd = userBets.some(c => {
+          const [a, b] = c.split("-").map(Number);
+          return a === f1 && b === f2;
+        });
+        const boatsArr = Object.values(reviewBoats);
+        const m1Sorted = [...boatsArr].sort((a, b) => (a.m1Rank ?? a.rank) - (b.m1Rank ?? b.rank));
+        const m1Combo = `${m1Sorted[0].id}-${m1Sorted[1].id}-${m1Sorted[2].id}`;
+        const isM1Hit = userBets.includes(m1Combo);
+        const firstMarkPat = document.getElementById("firstMarkPattern")?.value || "clean_in";
+        const dochuType = document.getElementById("dochuOvertakeType")?.value || "none";
+        const dochuReason = document.getElementById("dochuReason")?.value || "none";
+        const stDiffKado = (reviewBoats[4]?.actualSt || 0.14) - (reviewBoats[4]?.preSt || 0.14);
+
         reviewLogs.unshift({
           venue,
           raceNo,
           grade,
           actualCombo,
+          m1Combo,
+          kimarite,
           kimariteName: KIMARITE_LABELS[kimarite] || "逃げ",
+          firstMarkPat,
+          dochuType,
+          dochuReason,
           payout,
           invest,
           returnYen,
-          isHit
+          isHit,
+          isM1Hit,
+          missedThirdOnly: !isHit && has1st2nd,
+          stDiffKado
         });
+        try {
+          localStorage.setItem("BOATRACE_REVIEW_LOGS", JSON.stringify(reviewLogs));
+        } catch (e) {}
+        computeAndSaveLearnedParams();
         renderReviewLogs();
+      }
+
+
+      function computeAndSaveLearnedParams() {
+        if (reviewLogs.length === 0) return null;
+        const total = reviewLogs.length;
+        const nigeCnt = reviewLogs.filter(x => x.kimarite === "nige").length;
+        const makuriCnt = reviewLogs.filter(x => x.kimarite === "makuri").length;
+        const sashiCnt = reviewLogs.filter(x => x.kimarite === "sashi" || x.kimarite === "makurisashi").length;
+        const thirdMissCnt = reviewLogs.filter(x => x.missedThirdOnly).length;
+
+        const dochuOvertakeCnt = reviewLogs.filter(x => x.dochuType && x.dochuType !== "none").length;
+        const turnPowerCnt = reviewLogs.filter(x => x.dochuReason === "turn_power" || x.dochuReason === "racer_skill").length;
+        const clashWaitCnt = reviewLogs.filter(x => x.firstMarkPat === "clash_wait").length;
+        const m1MakuriAtkCnt = reviewLogs.filter(x => ["center_makuri_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length;
+
+        const nigeRatio = nigeCnt / total;
+        const makuriRatio = m1MakuriAtkCnt / total;
+        const sashiRatio = sashiCnt / total;
+        const dochuRatio = dochuOvertakeCnt / total;
+
+        // 1M展開要因（スリット・コース攻め）と道中逆転要因（展示気配・モーター・実力）を分離して重み付け学習
+        const w_course = Math.min(180, Math.max(70, Math.round((100 + (sashiRatio - 0.25) * 85 + (nigeRatio - 0.50) * 35) / 5) * 5));
+        const w_exhibit = Math.min(190, Math.max(80, Math.round((105 + dochuRatio * 55 + (turnPowerCnt / total) * 45) / 5) * 5));
+        const w_motor = Math.min(190, Math.max(80, Math.round((100 + dochuRatio * 60 + sashiRatio * 35) / 5) * 5));
+        const w_slit = Math.min(190, Math.max(80, Math.round((100 + (makuriRatio - 0.20) * 130) / 5) * 5));
+
+        const inModAdj = Math.round((nigeRatio - 0.52) * 24);
+        const makuriModAdj = Math.round((makuriRatio - 0.22) * 28);
+        const sashiModAdj = Math.round((sashiRatio - 0.24) * 26);
+        const waitBonusAdj = Math.min(22, thirdMissCnt * 5 + clashWaitCnt * 6 + dochuOvertakeCnt * 3);
+
+        // 会場別（24場別）の蓄積バイアスも個別に計算して保持
+        const venueBiases = {};
+        const byVenue = {};
+        reviewLogs.forEach(item => {
+          const v = item.venue || "平和島";
+          if (!byVenue[v]) byVenue[v] = [];
+          byVenue[v].push(item);
+        });
+        Object.keys(byVenue).forEach(v => {
+          const list = byVenue[v];
+          const vc = list.length;
+          const vNige = list.filter(x => x.kimarite === "nige").length / vc;
+          const vMak = list.filter(x => ["center_makuri_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length / vc;
+          const vSas = list.filter(x => x.kimarite === "sashi" || x.kimarite === "makurisashi").length / vc;
+          const vWait = list.filter(x => x.missedThirdOnly || x.firstMarkPat === "clash_wait" || (x.dochuType && x.dochuType !== "none")).length;
+          venueBiases[v] = {
+            count: vc,
+            inModAdj: Math.round((vNige - 0.52) * 24),
+            makuriModAdj: Math.round((vMak - 0.22) * 28),
+            sashiModAdj: Math.round((vSas - 0.24) * 26),
+            waitBonusAdj: Math.min(22, vWait * 5)
+          };
+        });
+
+        const learnedObj = {
+          type: "BOATRACE_LEARNED_PARAMS",
+          sampleCount: total,
+          hitRate: Math.round((reviewLogs.filter(x => x.isHit).length / total) * 100),
+          m1HitRate: Math.round((reviewLogs.filter(x => x.isM1Hit || x.isHit).length / total) * 100),
+          dochuRate: Math.round(dochuRatio * 100),
+          weights: { w_course, w_exhibit, w_motor, w_slit },
+          bias: { inModAdj, makuriModAdj, sashiModAdj, waitBonusAdj },
+          venueBiases,
+          recentLogs: reviewLogs.slice(0, 20),
+          updatedAt: new Date().toLocaleTimeString()
+        };
+
+        try {
+          localStorage.setItem("BOATRACE_LEARNED_PARAMS", JSON.stringify(learnedObj));
+        } catch (e) {}
+
+        const prevEl = document.getElementById("learnedParamsPreview");
+        if (prevEl) {
+          prevEl.innerHTML = `全<strong>${total}R</strong>の蓄積結果から算出 → 推奨重み付け: <strong>[①コース:${w_course}% / ②展示:${w_exhibit}% / ③機力:${w_motor}% / ④スリット:${w_slit}%]</strong> ｜ 補正: <strong>[イン${inModAdj >= 0 ? "+" : ""}${inModAdj} / まくり${makuriModAdj >= 0 ? "+" : ""}${makuriModAdj} / 差し${sashiModAdj >= 0 ? "+" : ""}${sashiModAdj} / 3着展開待ち+${waitBonusAdj}]</strong> （ブラウザ自動同期済）`;
+        }
+        return learnedObj;
+      }
+
+      function exportLearnedParamsToSimulator() {
+        const obj = computeAndSaveLearnedParams();
+        if (!obj) return;
+        const jsonStr = JSON.stringify(obj);
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = jsonStr;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        } catch (e) {}
+        const prevEl = document.getElementById("learnedParamsPreview");
+        if (prevEl) {
+          prevEl.innerHTML += `<span class="ml-2 bg-emerald-500 text-slate-950 font-black px-2 py-0.5 rounded">✅ 学習パラメータをコピー＆同期しました！予想シミュレーターの「🧠 学習データ反映」で即適用できます</span>`;
+        }
       }
 
       function clearReviewLogs() {
         reviewLogs = [];
+        try {
+          localStorage.removeItem("BOATRACE_REVIEW_LOGS");
+          localStorage.removeItem("BOATRACE_LEARNED_PARAMS");
+        } catch (e) {}
+        const prevEl = document.getElementById("learnedParamsPreview");
+        if (prevEl) prevEl.textContent = "蓄積データをリセットしました。";
         renderReviewLogs();
       }
 
@@ -3622,6 +4441,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           }
         }
 
+        infer1MProcessFromNumbers(false);
         renderBoatStTable();
         runReviewAnalysis();
         document.getElementById("pasteResultModal").classList.add("hidden");
@@ -3634,8 +4454,27 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         const dd = String(now.getDate()).padStart(2, "0");
         const dateEl = document.getElementById("fetchDateInput");
         if (dateEl) dateEl.value = `${yyyy}-${mm}-${dd}`;
+
+        // 過去に保存した蓄積ログをlocalStorageから復元（上書き消去しない！）
+        let loadedFromStorage = false;
+        try {
+          const savedLogs = localStorage.getItem("BOATRACE_REVIEW_LOGS");
+          if (savedLogs) {
+            const parsed = JSON.parse(savedLogs);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              reviewLogs = parsed;
+              loadedFromStorage = true;
+            }
+          }
+        } catch (e) {}
+
         loadSampleCase("makuri_hit");
-        saveCurrentReviewToLog();
+        if (!loadedFromStorage) {
+          saveCurrentReviewToLog();
+        } else {
+          computeAndSaveLearnedParams();
+          renderReviewLogs();
+        }
       });
     </script>
   </body>
@@ -3660,7 +4499,7 @@ def main():
             "💡 上のバーで日付・レース場・Rを選んで「🔄 公式データ自動取得」を押すと、出走表・直前情報・コース別攻め成功率・レースグレード(G1以上判定)が自動反映されます。"
         )
 
-    c_mode, c_date, c_venue, c_rno, c_btn = st.columns([1.7, 1.0, 1.5, 0.8, 2.0])
+    c_mode, c_date, c_venue, c_rno, c_btn, c_odds = st.columns([1.6, 0.95, 1.35, 0.7, 1.5, 1.1])
     with c_mode:
         app_mode = st.radio(
             "ツール切替",
@@ -3678,7 +4517,7 @@ def main():
         rno_int = st.selectbox("レース", list(range(1, 13)), index=11, format_func=lambda x: f"{x}R")
     with c_btn:
         st.write("")
-        if st.button("🔄 公式データ自動取得 (出走表＋直前情報＋G1判定)", type="primary", use_container_width=True):
+        if st.button("🔄 公式データ一括取得 (出走表＋展示＋オッズ)", type="primary", use_container_width=True):
             with st.spinner(f"BOAT RACE公式から {hd_str} {selected_venue[1]} {rno_int}R を取得中..."):
                 res_data = fetch_race_data_from_official(hd_str, jcd_str, rno_int)
                 if res_data.get("status") == "ok":
@@ -3691,6 +4530,22 @@ def main():
                     )
                 else:
                     st.error(res_data.get("message", "取得エラー"))
+
+    with c_odds:
+        st.write("")
+        if st.button("💹 最新オッズ更新", use_container_width=True):
+            with st.spinner(f"{selected_venue[1]} {rno_int}R の最新3連単オッズを更新中..."):
+                if not st.session_state.get("server_race_data"):
+                    st.session_state["server_race_data"] = fetch_race_data_from_official(hd_str, jcd_str, rno_int)
+                else:
+                    odds_bundle = fetch_latest_odds_only(hd_str, jcd_str, rno_int)
+                    st.session_state["server_race_data"]["odds3t"] = odds_bundle.get("odds3t", {})
+                    if odds_bundle.get("settledResult"):
+                        st.session_state["server_race_data"]["settledResult"] = odds_bundle["settledResult"]
+                cnt_o = len((st.session_state["server_race_data"] or {}).get("odds3t", {}))
+                st.session_state["status_banner"] = (
+                    f"💹 最新オッズ更新完了【{hd_str} {selected_venue[1]} {rno_int}R】：3連単 {cnt_o}通り反映済"
+                )
 
     active_venues = get_active_venues_for_date(hd_str)
     active_info = f" ｜ 📍 {hd_str} 開催場: {', '.join(active_venues)}" if active_venues else ""
