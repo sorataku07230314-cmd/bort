@@ -723,6 +723,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="f_winRate" checked onchange="runSimulation()"> 全国勝率(G1時:G1勝率)</label>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="f_localWin" checked onchange="runSimulation()"> 当地勝率(G1時:G1当地)</label>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="f_g1OnlyRule" checked onchange="runSimulation()"> 🏆G1以上はG1限定成績適用</label>
+            <label class="flex items-center gap-1.5 cursor-pointer font-bold text-pink-300"><input type="checkbox" id="f_ladiesRule" checked onchange="runSimulation()"> 💃女子戦データを入れる/考慮する</label>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="f_seriesScore" checked onchange="runSimulation()"> 節間成績点</label>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="f_weight" checked onchange="runSimulation()"> 選手体重差</label>
           </div>
@@ -804,7 +805,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
               <h2 class="text-xs font-bold text-sky-400">① レースグレード・開催日ウェイト ＆ 水面環境フィルター</h2>
               <span id="venueTraitBadge" class="text-[11px] bg-slate-800 text-amber-300 px-2 py-0.5 rounded"></span>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-7 gap-2 text-xs">
+            <div class="grid grid-cols-2 sm:grid-cols-8 gap-2 text-xs">
               <div>
                 <label class="block text-slate-400 text-[10px]">レース場(24場)</label>
                 <select id="venueSelect" onchange="onVenueChange()" class="w-full font-bold">
@@ -834,6 +835,14 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
                   <option value="G1" selected>🏆 G1 (G1以上成績のみ)</option>
                   <option value="PG1">👑 PG1 (G1以上成績のみ)</option>
                   <option value="SG">🔥 SG (G1以上成績のみ)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-pink-300 font-bold text-[10px]">💃女子戦データ適用</label>
+                <select id="ladiesModeSelect" onchange="onGradeChange()" class="w-full font-bold border-pink-500/60 text-pink-200">
+                  <option value="exclude" selected>🚫 入れない(女子戦かさ増し除外)</option>
+                  <option value="include">💃 入れる(女子戦モード・まくり/抜増)</option>
+                  <option value="raw">📊 通算そのまま(補正なし)</option>
                 </select>
               </div>
               <div>
@@ -931,18 +940,61 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
 
         <!-- 右カラム (5 cols): スリット図・決まり手確率・スコア・長文2パターン展開レポート・最大24点3連単＆EV・My予想AI採点チェッカー・note/X出力 -->
         <section class="lg:col-span-5 space-y-3">
-          <!-- スリット隊形＆1M攻防矢印マップ + 決まり手確率バー -->
-          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-3">
-            <div>
-              <div class="flex items-center justify-between mb-1.5">
-                <h2 class="text-xs font-bold text-emerald-400">📊 想定スリット隊形 ＆ 1M攻め手マップ</h2>
-                <span class="text-[10px] text-slate-400">赤破線＝カド境界 / 右青線＝スリット(0.00)</span>
+          <!-- 🖼️ 高精細スリット隊形画像 ＆ 1マーク展開画像ジェネレーター（ワンタップ画像コピー＆PNG保存対応） -->
+          <div class="bg-slate-900 border-2 border-emerald-500/40 rounded-xl p-3 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-800 pb-2">
+              <div>
+                <h2 class="text-xs font-bold text-emerald-300">🖼️ 想定スリット隊形画像 ＆ 1マーク展開軌道画像（X / note コピペ対応）</h2>
+                <span class="text-[10px] text-slate-400">ボタンを押すと画像としてクリップボードにコピーされ、Xやnoteにそのまま貼り付け(Ctrl+V)できます</span>
               </div>
-              <div class="bg-slate-950 border border-slate-800 rounded-lg p-2 relative overflow-hidden">
-                <div class="absolute right-10 top-0 bottom-0 w-0.5 bg-sky-400 shadow-[0_0_8px_#38bdf8] z-10"></div>
-                <div class="absolute right-11 top-1 text-[9px] text-sky-300 font-bold">START</div>
-                <div id="slitLanes"></div>
+              <div class="flex flex-wrap gap-1 text-[11px]">
+                <button onclick="copyCanvasToClipboard('slitCanvas', 'スリット隊形画像')" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-2 py-1 rounded shadow">
+                  📋 スリット画像をコピー
+                </button>
+                <button onclick="copyCanvasToClipboard('firstMarkCanvas', '1マーク展開画像')" class="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2 py-1 rounded shadow">
+                  📋 1マーク画像をコピー
+                </button>
+                <button onclick="copyCombinedSnsImage()" class="bg-pink-500 hover:bg-pink-400 text-white font-black px-2 py-1 rounded shadow">
+                  🖼️ 2枚合体画像をコピー
+                </button>
+                <button onclick="downloadCombinedSnsImage()" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 font-bold px-2 py-1 rounded">
+                  💾 PNG保存
+                </button>
               </div>
+            </div>
+
+            <div id="imageCopyToast" class="hidden text-[11px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/50 rounded px-2.5 py-1.5"></div>
+
+            <!-- 画像①：高精細スリット隊形キャンバス -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-bold text-sky-300">① 想定スリット隊形図（艇身目盛り・スロー/ダッシュ境界・ST差）</span>
+                <span class="text-[10px] text-slate-400">右端黄金ライン＝START(0.00) ／ 緑帯＝好STゾーン(.05〜.13)</span>
+              </div>
+              <div class="bg-slate-950 border border-slate-800 rounded-lg p-1 overflow-x-auto">
+                <canvas id="slitCanvas" width="860" height="390" class="w-full h-auto rounded"></canvas>
+              </div>
+              <div id="slitLanes" class="hidden"></div>
+            </div>
+
+            <!-- 画像②：1マーク（第1ターンマーク）旋回・展開軌道キャンバス -->
+            <div class="space-y-1 pt-1 border-t border-slate-800">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-bold text-amber-300">② 1マーク（第1ターンマーク）攻防・旋回ルート展開図</span>
+                <span class="text-[10px] text-slate-400">実線矢印＝先マイ・まくり・差し・展開待ち軌道 ／ 白波＝引き波ゾーン</span>
+              </div>
+              <div class="bg-slate-950 border border-slate-800 rounded-lg p-1 overflow-x-auto">
+                <canvas id="firstMarkCanvas" width="860" height="460" class="w-full h-auto rounded"></canvas>
+              </div>
+            </div>
+
+            <!-- スマホ・長押しコピー用プレビューモーダル -->
+            <div id="copyPreviewModal" class="hidden bg-slate-950 border-2 border-amber-400 rounded-lg p-2.5 space-y-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold text-amber-300">📸 下の画像を右クリック「画像をコピー」またはスマホ長押しで保存・コピーできます</span>
+                <button onclick="document.getElementById('copyPreviewModal').classList.add('hidden')" class="text-slate-400 hover:text-white font-bold">✕ 閉じる</button>
+              </div>
+              <img id="copyPreviewImg" src="" alt="生成画像プレビュー" class="w-full rounded border border-slate-700" />
             </div>
 
             <!-- 1着決まり手＆2パターン確率バーチャート -->
@@ -1078,7 +1130,21 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
               </div>
 
               <div>
-                <textarea id="userBetsInput" rows="2" oninput="evaluateUserPredictions()" placeholder="例: 1-2-3, 1-2-4, 3-4-5 またはフォーメーション表記 1-23-2345 / 3-4-全 (改行・カンマ・スペース区切り対応)" class="w-full bg-slate-900 border border-pink-500/40 rounded p-2 text-xs font-mono text-white focus:outline-none">1-2-4, 1-4-2, 3-4-5, 3-4-1</textarea>
+                <label class="block text-[10px] text-slate-400 mb-0.5">① あなたの3連単買い目入力（単発 `1-2-3` / フォーメーション `1-23-2345` / `3-4-全` 対応）</label>
+                <textarea id="userBetsInput" rows="2" oninput="evaluateUserPredictions()" placeholder="例: 1-2-3, 1-2-4, 3-4-5 またはフォーメーション表記 1-23-2345 / 3-4-全" class="w-full bg-slate-900 border border-pink-500/40 rounded p-2 text-xs font-mono text-white focus:outline-none">1-2-4, 1-4-2, 4-5-1, 4-1-5</textarea>
+              </div>
+
+              <div class="pt-1 border-t border-slate-800 space-y-1">
+                <div class="flex flex-wrap items-center justify-between gap-1">
+                  <label class="text-[11px] font-bold text-pink-300">✍️ ② この買い目の展開シナリオ・根拠を書く（AI整合性チェック＆note/X出力連動）</label>
+                  <div class="flex flex-wrap gap-1 text-[10px]">
+                    <button onclick="insertScenarioTemplate('in_escape')" class="bg-slate-800 hover:bg-slate-700 text-sky-300 px-1.5 py-0.5 rounded">+イン先マイ定型</button>
+                    <button onclick="insertScenarioTemplate('kado_makuri')" class="bg-slate-800 hover:bg-slate-700 text-rose-300 px-1.5 py-0.5 rounded">+カド捲り連動定型</button>
+                    <button onclick="insertScenarioTemplate('sashi_wait')" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-1.5 py-0.5 rounded">+差し＆展開待ち定型</button>
+                    <button onclick="applyUserScenarioToReport()" class="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2 py-0.5 rounded shadow">📝 このシナリオ＆買い目をnote/Xレポートに反映</button>
+                  </div>
+                </div>
+                <textarea id="userScenarioMemo" rows="3" oninput="evaluateUserPredictions()" placeholder="あなたが考えた1マークの展開ストーリーや狙い目の根拠を自由に書いてください（例：4カド大峯がスリット覗いてまくり仕掛け。外の5号艇がまくり差し連動し、展開待ちの1号艇が残る4-5-1を勝負目に指定！）" class="w-full bg-slate-900 border border-pink-500/40 rounded p-2 text-xs text-slate-100 leading-relaxed focus:outline-none">1コース白井の先マイ本線（1-24）を押さえつつ、カド4号艇大峯がスリット踏み込んでまくり仕掛けた際に外5号艇篠崎が連動する「4-5-1」「4-1-5」を逆転勝負目として狙う。</textarea>
               </div>
             </div>
 
@@ -1214,6 +1280,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           winRate: chk("f_winRate"),
           localWin: chk("f_localWin"),
           g1OnlyRule: chk("f_g1OnlyRule"),
+          ladiesRule: chk("f_ladiesRule"),
           seriesScore: chk("f_seriesScore"),
           weight: chk("f_weight"),
           courseWin: chk("f_courseWin"),
@@ -1452,7 +1519,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
 
       function setFactorPreset(mode) {
         const ids = [
-          "f_winRate", "f_localWin", "f_g1OnlyRule", "f_seriesScore", "f_weight",
+          "f_winRate", "f_localWin", "f_g1OnlyRule", "f_ladiesRule", "f_seriesScore", "f_weight",
           "f_courseWin", "f_courseTri", "f_courseKimarite", "f_nigashi", "f_nigashiTri",
           "f_motorBi", "f_exTimeRank", "f_oriTimeRank", "f_vis", "f_partsTilt",
           "f_avgSt", "f_seriesSt", "f_fCount", "f_env"
@@ -1646,6 +1713,10 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
               <select onchange="updateBoat(${b},'fCount',Number(this.value))" class="text-[11px] ${d.fCount > 0 ? "text-rose-400 font-bold" : ""}">
                 <option value="0" ${d.fCount === 0 ? "selected" : ""}>F0</option><option value="1" ${d.fCount === 1 ? "selected" : ""}>F1</option><option value="2" ${d.fCount === 2 ? "selected" : ""}>F2</option>
               </select>
+              <select onchange="updateBoat(${b},'isLady',this.value==='true')" class="text-[11px] ${(d.isLady || d.weight <= 49.0) ? "text-pink-300 font-bold border-pink-500/50" : "text-slate-400"}" title="男子選手 / 女子選手">
+                <option value="false" ${!(d.isLady || d.weight <= 49.0) ? "selected" : ""}>♂男</option>
+                <option value="true" ${(d.isLady || d.weight <= 49.0) ? "selected" : ""}>💃女</option>
+              </select>
               <span class="text-[10px] font-mono px-1.5 py-0.5 rounded ${g1Active ? "bg-amber-950 text-amber-300 border border-amber-600/40 font-bold" : "bg-slate-800 text-sky-300"}">${activeWinDisp}</span>
               <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-700/40">${attackSummary}</span>
               <span class="text-[10px] font-mono px-1.5 py-0.5 rounded ${exBadgeCls}">${(d.exTime || 6.80).toFixed(2)}s (${exRankLabel})</span>
@@ -1770,11 +1841,27 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           const isDash = courseNo >= kadoCourse;
           const isKado = courseNo === kadoCourse;
 
-          const effWinRate = g1Active ? (b.g1WinRate ?? b.winRate) : b.winRate;
-          const effLocalWin = g1Active ? (b.g1LocalWin ?? b.localWin) : b.localWin;
-          const effCourseWin = g1Active ? (b.g1CourseWin ?? b.courseWin) : b.courseWin;
-          const effCourseTri = g1Active ? (b.g1CourseTri ?? b.courseTri) : b.courseTri;
-          const effAvgSt = g1Active ? (b.g1AvgSt ?? b.avgSt) : b.avgSt;
+          const ladiesMode = document.getElementById("ladiesModeSelect")?.value || "exclude";
+          const isFemaleRacer = Boolean(b.isLady || b.weight <= 49.0);
+          const useLadiesData = af.ladiesRule && ladiesMode === "include";
+          const excludeLadiesInflation = !af.ladiesRule || ladiesMode === "exclude";
+
+          let effWinRate = g1Active ? (b.g1WinRate ?? b.winRate) : b.winRate;
+          let effLocalWin = g1Active ? (b.g1LocalWin ?? b.localWin) : b.localWin;
+          let effCourseWin = g1Active ? (b.g1CourseWin ?? b.courseWin) : b.courseWin;
+          let effCourseTri = g1Active ? (b.g1CourseTri ?? b.courseTri) : b.courseTri;
+          let effAvgSt = g1Active ? (b.g1AvgSt ?? b.avgSt) : b.avgSt;
+
+          if (excludeLadiesInflation && isFemaleRacer) {
+            // 女子戦データを入れない（女子戦でのB級相手かさ増し勝率・コース実績を割引補正）
+            effWinRate = Math.max(3.5, effWinRate - 0.55);
+            effLocalWin = Math.max(3.5, effLocalWin - 0.50);
+            effCourseWin = Math.max(2.0, effCourseWin * 0.86);
+            effCourseTri = Math.max(15.0, effCourseTri * 0.90);
+          } else if (useLadiesData) {
+            // 女子戦データを入れる（女子戦特有の2・3コースまくり増、道中逆転・抜き増、軽量ダッシュ有利を反映）
+            if (courseNo >= 2 && courseNo <= 4) effCourseWin = Math.min(85.0, effCourseWin * 1.12);
+          }
 
           const winTerm = af.winRate ? (effWinRate * 8.5 * cw.wm) : 50.0;
           const localTerm = af.localWin ? ((effLocalWin - effWinRate) * 14.0 * cw.wm) : 0.0;
@@ -2082,6 +2169,8 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         renderCourseAttackMatrix(courseEval);
         renderSlitMap(courseEval, kadoCourse);
         const kimariteStats = renderKimariteBars(courseEval);
+        drawSlitCanvas(courseEval, kadoCourse, venue, raceNo, raceGrade, windDir, windSpeed);
+        drawFirstMarkCanvas(courseEval, kadoCourse, venue, raceNo, raceGrade, windDir, windSpeed, kimariteStats);
         renderScoreTable(courseEval);
         generateNarrativeAndBets(
           courseEval,
@@ -2158,6 +2247,469 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             </div>
           </div>`;
         }
+      }
+
+
+      const BOAT_COLORS = {
+        1: { fill: "#ffffff", text: "#0f172a", stroke: "#cbd5e1", accent: "#f8fafc" },
+        2: { fill: "#1e293b", text: "#ffffff", stroke: "#94a3b8", accent: "#64748b" },
+        3: { fill: "#ef4444", text: "#ffffff", stroke: "#fca5a5", accent: "#f87171" },
+        4: { fill: "#3b82f6", text: "#ffffff", stroke: "#93c5fd", accent: "#60a5fa" },
+        5: { fill: "#eab308", text: "#0f172a", stroke: "#fde047", accent: "#facc15" },
+        6: { fill: "#22c55e", text: "#ffffff", stroke: "#86efac", accent: "#4ade80" }
+      };
+
+      function drawBoatShape(ctx, x, y, w, h, boatId, angleRad = 0) {
+        const c = BOAT_COLORS[boatId] || BOAT_COLORS[1];
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angleRad);
+
+        // 航跡（白波ウェーキ）
+        const grad = ctx.createLinearGradient(-w * 1.15, 0, -w * 0.3, 0);
+        grad.addColorStop(0, "rgba(255,255,255,0)");
+        grad.addColorStop(1, "rgba(186,230,253,0.45)");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.35, -h * 0.32);
+        ctx.lineTo(-w * 1.15, -h * 0.72);
+        ctx.lineTo(-w * 1.15, h * 0.72);
+        ctx.lineTo(-w * 0.35, h * 0.32);
+        ctx.closePath();
+        ctx.fill();
+
+        // ボート本体（先端が右向きの流線型）
+        ctx.fillStyle = c.fill;
+        ctx.strokeStyle = c.stroke;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(w * 0.52, 0);
+        ctx.quadraticCurveTo(w * 0.2, -h * 0.52, -w * 0.45, -h * 0.45);
+        ctx.lineTo(-w * 0.45, h * 0.45);
+        ctx.quadraticCurveTo(w * 0.2, h * 0.52, w * 0.52, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // 艇番テキスト
+        ctx.fillStyle = c.text;
+        ctx.font = "900 13px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(boatId), -w * 0.05, 0.5);
+        ctx.restore();
+      }
+
+      function drawSlitCanvas(courseEval, kadoCourse, venue, raceNo, raceGrade, windDir, windSpeed) {
+        const canvas = document.getElementById("slitCanvas");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        const W = canvas.width;
+        const H = canvas.height;
+
+        // 背景（深海ダークブルー）
+        const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+        bgGrad.addColorStop(0, "#071120");
+        bgGrad.addColorStop(1, "#0c1e36");
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, W, H);
+
+        // 上部タイトルバー
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(0, 0, W, 42);
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "bold 15px sans-serif";
+        ctx.textAlign = "left";
+        const gStr = raceGrade === "ippan" ? "一般" : raceGrade;
+        const wStr = windDir === "head" ? `向かい風${windSpeed}m` : windDir === "tail" ? `追い風${windSpeed}m` : windDir === "cross" ? `横風${windSpeed}m` : "無風";
+        ctx.fillText(`🎓 ぼーとだいがくせい｜${venue.name} ${raceNo}R (${gStr}) 想定スリット隊形 ＆ ST予測マップ`, 14, 26);
+
+        ctx.fillStyle = "#fbbf24";
+        ctx.font = "bold 12px sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(`水面: ${wStr} ／ カド: ${kadoCourse}コース`, W - 14, 26);
+
+        // スリット座標設計（左:120px 〜 STARTライン:710px）
+        const startX = 710;
+        const stToX = (stVal) => {
+          // st=0.00 -> 710px, st=0.25 -> 235px (1秒あたり1900px = 0.05sあたり95px)
+          return Math.max(150, Math.min(705, startX - stVal * 1900));
+        };
+
+        // 好スタートゾーン（.05〜.13）のグリーンハイライト帯
+        const zoneLeft = stToX(0.13);
+        const zoneRight = stToX(0.05);
+        ctx.fillStyle = "rgba(16, 185, 129, 0.10)";
+        ctx.fillRect(zoneLeft, 44, zoneRight - zoneLeft, H - 72);
+
+        // 縦のST目盛りグリッド線 (.20 / .15 / .10 / .05 / 0.00 START)
+        const stTicks = [
+          { st: 0.20, label: ".20 (遅れ)" },
+          { st: 0.15, label: ".15 (標準)" },
+          { st: 0.10, label: ".10 (好ST)" },
+          { st: 0.05, label: ".05 (踏み込み)" }
+        ];
+        stTicks.forEach(t => {
+          const tx = stToX(t.st);
+          ctx.strokeStyle = "rgba(148, 163, 184, 0.22)";
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(tx, 46);
+          ctx.lineTo(tx, H - 28);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = "#94a3b8";
+          ctx.font = "bold 11px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText(t.label, tx, H - 10);
+        });
+
+        // 0.00 START ライン（黄金＋発光）
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(startX, 44);
+        ctx.lineTo(startX, H - 26);
+        ctx.stroke();
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "900 12px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("START 0.00", startX, H - 10);
+
+        // 6コースのレーン描画
+        const topY = 50;
+        const laneH = 51;
+        for (let c = 1; c <= 6; c++) {
+          const obj = courseEval[c];
+          const yCenter = topY + (c - 0.5) * laneH;
+          const yTop = topY + (c - 1) * laneH;
+
+          // レーン背景交互色
+          ctx.fillStyle = c % 2 === 1 ? "rgba(15, 23, 42, 0.45)" : "rgba(30, 41, 59, 0.30)";
+          ctx.fillRect(10, yTop, W - 20, laneH);
+
+          // カド境界線（赤太破線）
+          if (c === kadoCourse) {
+            ctx.strokeStyle = "#f43f5e";
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([8, 5]);
+            ctx.beginPath();
+            ctx.moveTo(10, yTop);
+            ctx.lineTo(W - 10, yTop);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = "#f43f5e";
+            ctx.font = "bold 10px sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText(`▼ ${kadoCourse}カド (ダッシュ水域境界)`, 125, yTop + 11);
+          }
+
+          // 左端コース表示＋選手名ラベル
+          ctx.fillStyle = c >= kadoCourse ? "#fda4af" : "#cbd5e1";
+          ctx.font = "bold 12px monospace";
+          ctx.textAlign = "left";
+          ctx.fillText(`${c}C ${c >= kadoCourse ? "🔥ダ" : "ス"}`, 16, yCenter + 4);
+
+          // ボートのX位置（先端がexpectedStの位置に来るよう配置）
+          const noseX = stToX(obj.expectedSt);
+          const boatCenterX = noseX - 22;
+          drawBoatShape(ctx, boatCenterX, yCenter, 46, 22, obj.boatId, 0);
+
+          // ボート左側に選手名・展示時計
+          const cleanName = (obj.b.name || `${obj.boatId}号艇`).replace(/\s+/g, "");
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "bold 13px sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText(`${cleanName} (展${(obj.b.exTime || 6.80).toFixed(2)}s)`, boatCenterX - 34, yCenter + 4);
+
+          // ボート右側に想定STと1M攻め手バッジ
+          const stText = `.${Math.round(obj.expectedSt * 100).toString().padStart(2, "0")}`;
+          let atkLabel = "➡先マイ";
+          let atkColor = "#38bdf8";
+          if (obj.attackType === "makuri") { atkLabel = `⤴まくり(${obj.effMakuriRate.toFixed(0)}%)`; atkColor = "#fb7185"; }
+          else if (obj.attackType === "makurisashi") { atkLabel = `⚡まくり差(${obj.effMsRate.toFixed(0)}%)`; atkColor = "#fbbf24"; }
+          else if (obj.attackType === "sashi") { atkLabel = `📐差し(${obj.effSashiRate.toFixed(0)}%)`; atkColor = "#34d399"; }
+          else if (obj.attackType === "tenkaimachi") { atkLabel = `⏳展開待(${obj.effWaitRate.toFixed(0)}%)`; atkColor = "#c084fc"; }
+          else if (obj.attackType === "sotomai") { atkLabel = "🌀外マイ"; atkColor = "#22d3ee"; }
+          else if (obj.attackType === "hekomi") { atkLabel = "⚠️被弾/壁崩"; atkColor = "#94a3b8"; }
+
+          ctx.fillStyle = "#7dd3fc";
+          ctx.font = "900 13px monospace";
+          ctx.textAlign = "left";
+          ctx.fillText(`ST ${stText}`, noseX + 8, yCenter + 4);
+
+          ctx.fillStyle = atkColor;
+          ctx.font = "bold 12px sans-serif";
+          ctx.fillText(atkLabel, noseX + 66, yCenter + 4);
+        }
+      }
+
+      function drawFirstMarkCanvas(courseEval, kadoCourse, venue, raceNo, raceGrade, windDir, windSpeed, kimariteStats) {
+        const canvas = document.getElementById("firstMarkCanvas");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        const W = canvas.width;
+        const H = canvas.height;
+
+        // 1. 水面グラデーション背景
+        const waterGrad = ctx.createRadialGradient(340, 220, 30, 380, 230, 500);
+        waterGrad.addColorStop(0, "#0e3a5c");
+        waterGrad.addColorStop(0.6, "#09223a");
+        waterGrad.addColorStop(1, "#061527");
+        ctx.fillStyle = waterGrad;
+        ctx.fillRect(0, 0, W, H);
+
+        // 上部ヘッダー
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(0, 0, W, 40);
+        ctx.fillStyle = "#fbbf24";
+        ctx.font = "bold 15px sans-serif";
+        ctx.textAlign = "left";
+        const gStr = raceGrade === "ippan" ? "一般" : raceGrade;
+        ctx.fillText(`🌀 ${venue.name} ${raceNo}R (${gStr}) 1マーク（第1ターンマーク）旋回・展開軌道シミュレーション`, 14, 25);
+
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "bold 12px sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(`🟦イン逃げ ${kimariteStats.inEscapePct}% vs 🟥非イン逆転 ${kimariteStats.nonInPct}%`, W - 14, 25);
+
+        // 2. 水面波紋＆1マーク（赤白ターンマークブイ）の描画
+        const buoyX = 310;
+        const buoyY = 235;
+
+        // ターンマーク周囲の波紋
+        [36, 62, 92].forEach(r => {
+          ctx.strokeStyle = "rgba(56, 189, 248, 0.16)";
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(buoyX, buoyY, r, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+
+        // 1マークブイ本体
+        ctx.fillStyle = "#ef4444";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(buoyX, buoyY, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "900 10px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("1M", buoyX, buoyY + 3.5);
+
+        // 水面エリア案内ラベル
+        ctx.fillStyle = "rgba(148, 163, 184, 0.55)";
+        ctx.font = "bold 12px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText("◀ バックストレッチ（1M出口・直線）", 45, 70);
+        ctx.fillText("ホームストレッチ（スリット進入側） ▶", 560, 405);
+
+        // 3. 6艇の進入開始点(右) → 1マーク旋回制御点 → 1M出口到達点(左上)の軌道描画
+        const hasMakuriBoat = Object.values(courseEval).find(x => x.attackType === "makuri" && x.courseNo >= 2);
+        if (hasMakuriBoat) {
+          // まくり発生時の白い引き波ゾーン（1Mブイのすぐ上〜左側）
+          ctx.save();
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.32)";
+          ctx.lineWidth = 14;
+          ctx.setLineDash([10, 6]);
+          ctx.beginPath();
+          ctx.arc(buoyX - 10, buoyY - 15, 58, Math.PI * 0.85, Math.PI * 1.65);
+          ctx.stroke();
+          ctx.fillStyle = "#fda4af";
+          ctx.font = "bold 11px sans-serif";
+          ctx.fillText("🌊まくり引き波(被弾域)", buoyX - 95, buoyY - 52);
+          ctx.restore();
+        }
+
+        // 各コースの軌道パラメータ計算
+        for (let c = 1; c <= 6; c++) {
+          const obj = courseEval[c];
+          const bColor = BOAT_COLORS[obj.boatId] || BOAT_COLORS[1];
+          const startX = 760 - (0.16 - obj.expectedSt) * 350;
+          const startY = 175 + (c - 1) * 38;
+
+          let cp1X = buoyX + 60;
+          let cp1Y = buoyY + 25 + (c - 1) * 14;
+          let cp2X = buoyX - 75;
+          let cp2Y = buoyY - 25;
+          let endX = 165;
+          let endY = 120;
+          let endAngle = -Math.PI * 0.78;
+          let dashed = false;
+
+          if (c === 1 && obj.attackType !== "hekomi") {
+            // イン先マイ軌道
+            cp1X = buoyX + 35; cp1Y = buoyY + 32;
+            cp2X = buoyX - 55; cp2Y = buoyY - 10;
+            endX = 155; endY = 128;
+            endAngle = -Math.PI * 0.82;
+          } else if (obj.attackType === "makuri") {
+            // 豪快な外まくり大外弧軌道
+            cp1X = buoyX + 20; cp1Y = buoyY + 10;
+            cp2X = buoyX - 40; cp2Y = buoyY - 115;
+            endX = 135; endY = 78;
+            endAngle = -Math.PI * 0.90;
+          } else if (obj.attackType === "makurisashi") {
+            // まくり差し（間を割る鋭角S字軌道）
+            cp1X = buoyX + 55; cp1Y = buoyY + 35;
+            cp2X = buoyX - 25; cp2Y = buoyY - 48;
+            endX = 150; endY = 104 + (c - 3) * 14;
+            endAngle = -Math.PI * 0.84;
+          } else if (obj.attackType === "sashi") {
+            // 1Mブイ際を小回りする差し軌道
+            cp1X = buoyX + 65; cp1Y = buoyY + 52;
+            cp2X = buoyX - 15; cp2Y = buoyY + 20;
+            endX = 175; endY = 162 + (c - 2) * 16;
+            endAngle = -Math.PI * 0.76;
+          } else if (obj.attackType === "tenkaimachi") {
+            // 最内ブイ下を冷静に拾う展開待ち軌道
+            cp1X = buoyX + 75; cp1Y = buoyY + 75;
+            cp2X = buoyX + 5; cp2Y = buoyY + 45;
+            endX = 205; endY = 195 + (c - 4) * 20;
+            endAngle = -Math.PI * 0.72;
+          } else if (obj.attackType === "hekomi") {
+            // 引き波被弾・外流れ点線軌道
+            cp1X = buoyX + 30; cp1Y = buoyY + 20;
+            cp2X = buoyX - 110; cp2Y = buoyY - 90;
+            endX = 250; endY = 72 + c * 10;
+            endAngle = -Math.PI * 0.65;
+            dashed = true;
+          } else {
+            // 外マイ追走
+            cp1X = buoyX + 30; cp1Y = buoyY + 25;
+            cp2X = buoyX - 95; cp2Y = buoyY - 85;
+            endX = 215; endY = 92 + c * 8;
+            endAngle = -Math.PI * 0.85;
+          }
+
+          // 軌道ラインの描画
+          ctx.save();
+          ctx.strokeStyle = bColor.accent;
+          ctx.lineWidth = (obj.attackType === "makuri" || (c === 1 && obj.attackType === "nige")) ? 3.5 : 2.4;
+          if (dashed) ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
+          ctx.stroke();
+          ctx.restore();
+
+          // スリット側スタート地点の小バッジ
+          ctx.fillStyle = bColor.fill;
+          ctx.beginPath();
+          ctx.arc(startX, startY, 9, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = bColor.text;
+          ctx.font = "bold 10px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(String(obj.boatId), startX, startY + 3.5);
+
+          // 1M出口到達地点のボート＆選手名ラベル描画
+          drawBoatShape(ctx, endX, endY, 40, 19, obj.boatId, endAngle);
+
+          const cleanName = (obj.b.name || `${obj.boatId}号艇`).split(" ")[0];
+          const roleShort = obj.roleText.replace(/🎯指定:/g, "");
+          ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+          ctx.strokeStyle = bColor.stroke;
+          ctx.lineWidth = 1.2;
+          const labelText = `${obj.boatId}.${cleanName} [${roleShort}]`;
+          ctx.font = "bold 11px sans-serif";
+          const tw = ctx.measureText(labelText).width + 10;
+          ctx.fillRect(endX - tw - 18, endY - 10, tw, 20);
+          ctx.strokeRect(endX - tw - 18, endY - 10, tw, 20);
+          ctx.fillStyle = "#f8fafc";
+          ctx.textAlign = "right";
+          ctx.fillText(labelText, endX - 23, endY + 4);
+        }
+
+        // 4. 下部フッター（2パターン結論＆クレジット）
+        ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
+        ctx.fillRect(0, H - 36, W, 36);
+        ctx.fillStyle = "#e2e8f0";
+        ctx.font = "bold 12px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(`🎓 ぼーとだいがくせい (@Boatrace__daisu) ｜ 1M展開軌道＆スジ連動シミュレーション`, 14, H - 13);
+      }
+
+      function showImageToast(msg) {
+        const toast = document.getElementById("imageCopyToast");
+        if (!toast) return;
+        toast.textContent = msg;
+        toast.classList.remove("hidden");
+        setTimeout(() => toast.classList.add("hidden"), 3500);
+      }
+
+      async function copyCanvasToClipboard(canvasId, labelName) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        const dataUrl = canvas.toDataURL("image/png");
+        const prevModal = document.getElementById("copyPreviewModal");
+        const prevImg = document.getElementById("copyPreviewImg");
+        if (prevImg) prevImg.src = dataUrl;
+
+        try {
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+          if (navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+            showImageToast(`✅ ${labelName}をクリップボードにコピーしました！Xやnoteの投稿欄でそのまま貼り付け(Ctrl+V)できます。`);
+            return;
+          }
+        } catch (e) {}
+
+        if (prevModal) prevModal.classList.remove("hidden");
+        showImageToast(`📸 下に${labelName}を表示しました！右クリック「画像をコピー」またはスマホ長押しでコピーできます。`);
+      }
+
+      function createCombinedCanvas() {
+        const c1 = document.getElementById("slitCanvas");
+        const c2 = document.getElementById("firstMarkCanvas");
+        if (!c1 || !c2) return null;
+        const out = document.createElement("canvas");
+        out.width = Math.max(c1.width, c2.width);
+        out.height = c1.height + c2.height + 8;
+        const ctx = out.getContext("2d");
+        ctx.fillStyle = "#090d16";
+        ctx.fillRect(0, 0, out.width, out.height);
+        ctx.drawImage(c1, 0, 0);
+        ctx.drawImage(c2, 0, c1.height + 8);
+        return out;
+      }
+
+      async function copyCombinedSnsImage() {
+        const combined = createCombinedCanvas();
+        if (!combined) return;
+        const dataUrl = combined.toDataURL("image/png");
+        const prevModal = document.getElementById("copyPreviewModal");
+        const prevImg = document.getElementById("copyPreviewImg");
+        if (prevImg) prevImg.src = dataUrl;
+
+        try {
+          const blob = await new Promise(resolve => combined.toBlob(resolve, "image/png"));
+          if (navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+            showImageToast("✅ スリット図＋1マーク展開図の【2枚合体画像】をクリップボードにコピーしました！そのままXやnoteに貼り付けできます！");
+            return;
+          }
+        } catch (e) {}
+
+        if (prevModal) prevModal.classList.remove("hidden");
+        showImageToast("📸 下に【2枚合体画像】を表示しました！右クリック「画像をコピー」またはスマホ長押しで保存できます。");
+      }
+
+      function downloadCombinedSnsImage() {
+        const combined = createCombinedCanvas();
+        if (!combined) return;
+        const a = document.createElement("a");
+        const vCode = document.getElementById("venueSelect")?.value || "04";
+        const rno = document.getElementById("raceNoSelect")?.value || "12";
+        a.href = combined.toDataURL("image/png");
+        a.download = `boatrace_${vCode}_${rno}R_slit_1mark.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showImageToast("💾 スリット＋1マーク合体PNG画像をダウンロードしました！");
       }
 
       function renderKimariteBars(courseEval) {
@@ -2659,6 +3211,62 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         }
       }
 
+
+      function insertScenarioTemplate(tplType) {
+        const el = document.getElementById("userScenarioMemo");
+        if (!el || !latestSimContext) return;
+        const { inObj, c2Obj, kadoObj, nonIn1, nf1, inFollowers } = latestSimContext;
+        if (tplType === "in_escape") {
+          el.value = `1コース${inObj.boatId}号艇(${inObj.b.name})がスタート互角から1マークを先マイ押し切り。2コース${c2Obj.boatId}号艇(${c2Obj.b.name})の差し追走と、外から握って回る${inFollowers[1].boatId}号艇(${inFollowers[1].b.name})を連対軸にしたイン逃げ本線シナリオ。`;
+        } else if (tplType === "kado_makuri") {
+          el.value = `${kadoObj.courseNo}コースカドの${kadoObj.boatId}号艇(${kadoObj.b.name})がスリットから覗いて1Mまくり敢行！内枠が引き波にハマる展開を突き、外隣からまくり差し連動する${nf1.boatId}号艇(${nf1.b.name})と最内展開待ち勢への高配当スジを狙い撃つ。`;
+        } else if (tplType === "sashi_wait") {
+          el.value = `1マークで1号艇(${inObj.b.name})とセンター攻め艇(${nonIn1.boatId}号艇)がやり合って外へ流れる展開を想定。ブイ際を冷静に差し抜ける${c2Obj.boatId}号艇・展開待ちから浮上する${nf1.boatId}号艇を軸にイン残しまでケア。`;
+        }
+        evaluateUserPredictions();
+      }
+
+      function applyUserScenarioToReport() {
+        const memo = (document.getElementById("userScenarioMemo")?.value || "").trim();
+        const rawBets = document.getElementById("userBetsInput")?.value || "";
+        const userCombos = parseUserBetsString(rawBets);
+        if (!memo && userCombos.length === 0) return;
+
+        const nameOf = (id) => (boatsData[id]?.name || `${id}`).split(" ")[0];
+        const formattedUserBets = userCombos.map(c => {
+          const [a, b, d] = c.split("-").map(Number);
+          const od = liveOddsMap[c] ? ` (${liveOddsMap[c].toFixed(1)}倍)` : "";
+          return `${c} (${nameOf(a)}→${nameOf(b)}→${nameOf(d)})${od}`;
+        }).join("\n  ・");
+
+        const customPaidSection = [
+          `■ 3. 1マークの攻防（✍️ ぼーとだいがくせいの勝負展開シナリオ）`,
+          memo || "スリット隊形と1マークのスジ連動から算出した勝負シナリオです。",
+          ``,
+          `🎯 4. 推奨3連単買い目（計${userCombos.length}点）`,
+          `  ・${formattedUserBets || "買い目未入力"}`,
+          `※直前オッズでEV(期待値)105%以上の目を厚めに推奨。舟券の購入は自己責任でお楽しみください。`,
+          `🎓 ぼーとだいがくせい｜X: https://x.com/Boatrace__daisu ｜ note: https://note.com/boatrace__daisu`,
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+        ].join("\n");
+
+        latestReportParts.paid = customPaidSection;
+        latestReportParts.paywall = `${latestReportParts.free}\n\n--- 🔒 ここから先は有料エリア（noteの有料ラインをここに設定） ---\n\n${customPaidSection}`;
+        latestReportParts.full = `${latestReportParts.free.split("▼ ここから先の有料パートでは")[0].trim()}\n\n${customPaidSection}`;
+
+        const reportFmt = document.getElementById("reportFormatSelect")?.value || "note_paywall";
+        const outEl = document.getElementById("noteReportTextarea");
+        if (outEl) {
+          outEl.value = reportFmt === "note_paywall" ? latestReportParts.paywall : (reportFmt === "x_promo" ? latestReportParts.x_promo : latestReportParts.full);
+        }
+        const toast = document.getElementById("copyNoteToast");
+        if (toast) {
+          toast.textContent = "✅ あなたが書いたシナリオと入力買い目を、下のnote/Xレポートに反映しました！";
+          toast.classList.remove("hidden");
+          setTimeout(() => toast.classList.add("hidden"), 3000);
+        }
+      }
+
       function clearUserBetsInput() {
         const el = document.getElementById("userBetsInput");
         if (el) {
@@ -2842,6 +3450,18 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         }
         if (userScenario === "c2_makuri" && c2Obj.effMakuriRate >= 6.0) {
           advices.push(`🔥 <strong>【2コースジカまくり妙味】</strong> 2コース${c2Obj.boatId}号艇のまくり率は<strong>${c2Obj.effMakuriRate.toFixed(1)}%</strong>。2コースがまくると1コースが引き波に沈み、3コース<strong>${c3Obj.boatId}号艇</strong>・4コース<strong>${c4Obj.boatId}号艇</strong>の差し連動（${c2Obj.boatId}-${c3Obj.boatId}-${c4Obj.boatId}）が特大万舟スジになります！`);
+        }
+        const memoText = (document.getElementById("userScenarioMemo")?.value || "").trim();
+        if (memoText) {
+          let memoCheckMsg = `📖 <strong>【あなたの記述シナリオ診断】</strong> 「<em>${memoText.slice(0, 75)}${memoText.length > 75 ? "..." : ""}</em>」`;
+          if (memoText.includes("まくり") && !memoText.includes("まくり差") && inCount === evaluatedItems.length) {
+            memoCheckMsg += ` → ⚠️ シナリオ文章で「まくり」に言及されていますが、買い目が1コース1着（イン逃げ）のみになっています。まくった艇のアタマ（非イン目）も追加するとシナリオと一致します！`;
+          } else if (memoText.includes("逃げ") && nonInCount === evaluatedItems.length) {
+            memoCheckMsg += ` → ⚠️ シナリオ文章に「逃げ」とありますが、買い目に1コース1着が入っていません。`;
+          } else {
+            memoCheckMsg += ` → ✅ <strong>シナリオのストーリーと買い目のスジ構成がしっかり一致しています！</strong>（「📝 このシナリオ＆買い目をnote/Xレポートに反映」ボタンでそのまま記事化できます）`;
+          }
+          advices.unshift(memoCheckMsg);
         }
         if (advices.length === 0) {
           advices.push(`✅ <strong>【スジ整合性◎】</strong> 狙っている1着艇の決まり手（逃げ・差し・まくり）に対して、2・3着の連動艇（外隣やイン残し・展開待ち）が的確に押さえられた完成度の高いフォーメーションです！`);
