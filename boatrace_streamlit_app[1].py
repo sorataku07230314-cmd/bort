@@ -2977,8 +2977,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
         let cnt = 0;
 
         // 1. 「1-2-3 6.8」や「1-2-3: 12.4」形式の直接ペア抽出
-        const pairMatches = [...raw.matchAll(/([1-6])\s*[-=]\s*([1-6])\s*[-=]\s*([1-6])[^\d
-]{1,15}(\d+\.\d+)/g)];
+        const pairMatches = [...raw.matchAll(/([1-6])\s*[-=]\s*([1-6])\s*[-=]\s*([1-6])[^\d\n]{1,15}(\d+\.\d+)/g)];
         pairMatches.forEach(m => {
           const combo = `${m[1]}-${m[2]}-${m[3]}`;
           const val = parseFloat(m[4]);
