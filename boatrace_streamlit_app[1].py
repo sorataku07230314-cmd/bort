@@ -972,7 +972,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
                 <span class="text-[10px] text-slate-400">右端黄金ライン＝START(0.00) ／ 緑帯＝好STゾーン(.05〜.13)</span>
               </div>
               <div class="bg-slate-950 border border-slate-800 rounded-lg p-1 overflow-x-auto">
-                <canvas id="slitCanvas" width="860" height="390" class="w-full h-auto rounded"></canvas>
+                <canvas id="slitCanvas" width="900" height="420" class="w-full h-auto rounded"></canvas>
               </div>
               <div id="slitLanes" class="hidden"></div>
             </div>
@@ -984,7 +984,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
                 <span class="text-[10px] text-slate-400">実線矢印＝先マイ・まくり・差し・展開待ち軌道 ／ 白波＝引き波ゾーン</span>
               </div>
               <div class="bg-slate-950 border border-slate-800 rounded-lg p-1 overflow-x-auto">
-                <canvas id="firstMarkCanvas" width="860" height="460" class="w-full h-auto rounded"></canvas>
+                <canvas id="firstMarkCanvas" width="900" height="560" class="w-full h-auto rounded"></canvas>
               </div>
             </div>
 
@@ -2251,386 +2251,477 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
 
 
       const BOAT_COLORS = {
-        1: { fill: "#ffffff", text: "#0f172a", stroke: "#cbd5e1", accent: "#f8fafc" },
-        2: { fill: "#1e293b", text: "#ffffff", stroke: "#94a3b8", accent: "#64748b" },
-        3: { fill: "#ef4444", text: "#ffffff", stroke: "#fca5a5", accent: "#f87171" },
-        4: { fill: "#3b82f6", text: "#ffffff", stroke: "#93c5fd", accent: "#60a5fa" },
-        5: { fill: "#eab308", text: "#0f172a", stroke: "#fde047", accent: "#facc15" },
-        6: { fill: "#22c55e", text: "#ffffff", stroke: "#86efac", accent: "#4ade80" }
+        1: { body: "#ffffff", border: "#94a3b8", innerBorder: "#94a3b8", tip: "#e2e8f0", text: "#0f172a", numText: "#0f172a", line: "#ffffff", name: "白" },
+        2: { body: "#111827", border: "#ffffff", innerBorder: "#0f172a", tip: "#ffffff", text: "#ffffff", numText: "#0f172a", line: "#111827", name: "黒" },
+        3: { body: "#ef4444", border: "#ffffff", innerBorder: "#b91c1c", tip: "#ffffff", text: "#ffffff", numText: "#dc2626", line: "#ef4444", name: "赤" },
+        4: { body: "#2563eb", border: "#ffffff", innerBorder: "#1d4ed8", tip: "#ffffff", text: "#ffffff", numText: "#1d4ed8", line: "#2563eb", name: "青" },
+        5: { body: "#facc15", border: "#ffffff", innerBorder: "#ca8a04", tip: "#ffffff", text: "#0f172a", numText: "#a16207", line: "#facc15", name: "黄" },
+        6: { body: "#16a34a", border: "#ffffff", innerBorder: "#15803d", tip: "#ffffff", text: "#ffffff", numText: "#15803d", line: "#16a34a", name: "緑" }
       };
 
-      function drawBoatShape(ctx, x, y, w, h, boatId, angleRad = 0) {
+      // 参考画像(競艇解説図スタイル)を2倍Retina高解像度で完全再現した6艇ボートアイコン描画関数（ターン後も艇番数字が常に正立）
+      function drawClassicBoatIcon(ctx, x, y, scale, boatId, angleRad, alpha = 1.0, labelText = "", rankBadge = "") {
         const c = BOAT_COLORS[boatId] || BOAT_COLORS[1];
         ctx.save();
+        ctx.globalAlpha = alpha;
         ctx.translate(x, y);
         ctx.rotate(angleRad);
+        ctx.scale(scale, scale);
 
-        // 航跡（白波ウェーキ）
-        const grad = ctx.createLinearGradient(-w * 1.15, 0, -w * 0.3, 0);
-        grad.addColorStop(0, "rgba(255,255,255,0)");
-        grad.addColorStop(1, "rgba(186,230,253,0.45)");
-        ctx.fillStyle = grad;
+        // 1. 外側ホワイトハル（参考画像と同じ白縁＋黒細枠のシャープな五角形）
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#0f172a";
+        ctx.lineWidth = 2.2;
         ctx.beginPath();
-        ctx.moveTo(-w * 0.35, -h * 0.32);
-        ctx.lineTo(-w * 1.15, -h * 0.72);
-        ctx.lineTo(-w * 1.15, h * 0.72);
-        ctx.lineTo(-w * 0.35, h * 0.32);
-        ctx.closePath();
-        ctx.fill();
-
-        // ボート本体（先端が右向きの流線型）
-        ctx.fillStyle = c.fill;
-        ctx.strokeStyle = c.stroke;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(w * 0.52, 0);
-        ctx.quadraticCurveTo(w * 0.2, -h * 0.52, -w * 0.45, -h * 0.45);
-        ctx.lineTo(-w * 0.45, h * 0.45);
-        ctx.quadraticCurveTo(w * 0.2, h * 0.52, w * 0.52, 0);
+        ctx.moveTo(-48, -22);
+        ctx.lineTo(14, -22);
+        ctx.lineTo(54, 0);
+        ctx.lineTo(14, 22);
+        ctx.lineTo(-48, 22);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // 艇番テキスト
-        ctx.fillStyle = c.text;
-        ctx.font = "900 13px sans-serif";
+        // 2. 内側カラーボディ（先端ノーズの白い三角形を残して艇番カラーで塗る）
+        ctx.fillStyle = c.body;
+        ctx.strokeStyle = c.innerBorder;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(-44, -18);
+        ctx.lineTo(12, -18);
+        ctx.lineTo(30, -8);
+        ctx.lineTo(30, 8);
+        ctx.lineTo(12, 18);
+        ctx.lineTo(-44, 18);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // 先端ノーズのV字ディテール
+        ctx.strokeStyle = "#64748b";
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(30, -8);
+        ctx.lineTo(51, 0);
+        ctx.lineTo(30, 8);
+        ctx.stroke();
+
+        // 3. 後部の黒いモーター突起
+        ctx.fillStyle = "#090d16";
+        ctx.fillRect(-55, -8, 12, 16);
+
+        // 4. 中央の白丸ナンバーサークル
+        const numCenterX = -10;
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = boatId === 1 ? "#475569" : c.innerBorder;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.arc(numCenterX, 0, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 5. 艇番数字（★重要：ターン後も逆さまにならないよう -angleRad で常に正立させる！）
+        ctx.save();
+        ctx.translate(numCenterX, 0);
+        ctx.rotate(-angleRad);
+        ctx.fillStyle = c.numText;
+        ctx.font = "900 21px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(String(boatId), -w * 0.05, 0.5);
+        ctx.fillText(String(boatId), 0, 1);
         ctx.restore();
+
+        ctx.restore();
+
+        // 6. 出口ボートの選手名＆順位ラベル（艇の先端前方に水平配置し、ボートや軌跡と一切重ならない）
+        if (labelText && alpha >= 0.9) {
+          ctx.save();
+          const noseDist = 42 * scale;
+          const lx = x + Math.cos(angleRad) * noseDist;
+          const ly = y + Math.sin(angleRad) * noseDist;
+          const fullLabel = rankBadge ? `${rankBadge} ${labelText}` : labelText;
+          ctx.font = "bold 12px sans-serif";
+          const tw = ctx.measureText(fullLabel).width + 14;
+          const bx = lx - tw - 4;
+          const by = ly - 10;
+          ctx.fillStyle = "rgba(15, 23, 42, 0.90)";
+          ctx.fillRect(bx, by, tw, 20);
+          ctx.strokeStyle = c.body === "#111827" ? "#94a3b8" : c.body;
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(bx, by, tw, 20);
+          ctx.fillStyle = "#ffffff";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(fullLabel, bx + tw / 2, by + 10);
+          ctx.restore();
+        }
       }
 
       function drawSlitCanvas(courseEval, kadoCourse, venue, raceNo, raceGrade, windDir, windSpeed) {
         const canvas = document.getElementById("slitCanvas");
         if (!canvas) return;
+        const W = 920;
+        const H = 400;
+        if (canvas.width !== W * 2 || canvas.height !== H * 2) {
+          canvas.width = W * 2;
+          canvas.height = H * 2;
+        }
         const ctx = canvas.getContext("2d");
-        const W = canvas.width;
-        const H = canvas.height;
+        ctx.save();
+        ctx.scale(2, 2);
 
-        // 背景（深海ダークブルー）
-        const bgGrad = ctx.createLinearGradient(0, 0, W, H);
-        bgGrad.addColorStop(0, "#071120");
-        bgGrad.addColorStop(1, "#0c1e36");
-        ctx.fillStyle = bgGrad;
+        // 鮮やかな水色水面背景
+        ctx.fillStyle = "#18d4f2";
         ctx.fillRect(0, 0, W, H);
 
-        // 上部タイトルバー
+        // 上部ヘッダー帯
         ctx.fillStyle = "#0f172a";
-        ctx.fillRect(0, 0, W, 42);
-        ctx.fillStyle = "#38bdf8";
+        ctx.fillRect(0, 0, W, 40);
+        ctx.fillStyle = "#ffffff";
         ctx.font = "bold 15px sans-serif";
         ctx.textAlign = "left";
         const gStr = raceGrade === "ippan" ? "一般" : raceGrade;
         const wStr = windDir === "head" ? `向かい風${windSpeed}m` : windDir === "tail" ? `追い風${windSpeed}m` : windDir === "cross" ? `横風${windSpeed}m` : "無風";
-        ctx.fillText(`🎓 ぼーとだいがくせい｜${venue.name} ${raceNo}R (${gStr}) 想定スリット隊形 ＆ ST予測マップ`, 14, 26);
+        ctx.fillText(`🎓 ぼーとだいがくせい｜${venue.name} ${raceNo}R (${gStr}) 想定スリット隊形（6艇）`, 14, 25);
 
-        ctx.fillStyle = "#fbbf24";
-        ctx.font = "bold 12px sans-serif";
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "bold 13px sans-serif";
         ctx.textAlign = "right";
-        ctx.fillText(`水面: ${wStr} ／ カド: ${kadoCourse}コース`, W - 14, 26);
+        ctx.fillText(`${wStr} ／ カド: ${kadoCourse}コース`, W - 14, 25);
 
-        // スリット座標設計（左:120px 〜 STARTライン:710px）
-        const startX = 710;
-        const stToX = (stVal) => {
-          // st=0.00 -> 710px, st=0.25 -> 235px (1秒あたり1900px = 0.05sあたり95px)
-          return Math.max(150, Math.min(705, startX - stVal * 1900));
-        };
+        const startX = 735;
+        const stToX = (stVal) => Math.max(200, Math.min(730, startX - stVal * 2000));
 
-        // 好スタートゾーン（.05〜.13）のグリーンハイライト帯
-        const zoneLeft = stToX(0.13);
-        const zoneRight = stToX(0.05);
-        ctx.fillStyle = "rgba(16, 185, 129, 0.10)";
-        ctx.fillRect(zoneLeft, 44, zoneRight - zoneLeft, H - 72);
-
-        // 縦のST目盛りグリッド線 (.20 / .15 / .10 / .05 / 0.00 START)
-        const stTicks = [
+        // 縦のST目盛り線 (.20 / .15 / .10 / .05 / 0.00 START)
+        [
           { st: 0.20, label: ".20 (遅れ)" },
           { st: 0.15, label: ".15 (標準)" },
           { st: 0.10, label: ".10 (好ST)" },
           { st: 0.05, label: ".05 (踏み込み)" }
-        ];
-        stTicks.forEach(t => {
+        ].forEach(t => {
           const tx = stToX(t.st);
-          ctx.strokeStyle = "rgba(148, 163, 184, 0.22)";
-          ctx.lineWidth = 1;
-          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = "rgba(15, 23, 42, 0.22)";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([6, 4]);
           ctx.beginPath();
-          ctx.moveTo(tx, 46);
-          ctx.lineTo(tx, H - 28);
+          ctx.moveTo(tx, 42);
+          ctx.lineTo(tx, H - 26);
           ctx.stroke();
           ctx.setLineDash([]);
-          ctx.fillStyle = "#94a3b8";
-          ctx.font = "bold 11px monospace";
+          ctx.fillStyle = "#0f172a";
+          ctx.font = "bold 12px sans-serif";
           ctx.textAlign = "center";
-          ctx.fillText(t.label, tx, H - 10);
+          ctx.fillText(t.label, tx, H - 8);
         });
 
-        // 0.00 START ライン（黄金＋発光）
-        ctx.strokeStyle = "#38bdf8";
-        ctx.lineWidth = 3;
+        // START 0.00 赤ライン
+        ctx.strokeStyle = "#dc2626";
+        ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(startX, 44);
-        ctx.lineTo(startX, H - 26);
+        ctx.moveTo(startX, 42);
+        ctx.lineTo(startX, H - 24);
         ctx.stroke();
-        ctx.fillStyle = "#38bdf8";
-        ctx.font = "900 12px monospace";
+        ctx.fillStyle = "#dc2626";
+        ctx.font = "900 13px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("START 0.00", startX, H - 10);
+        ctx.fillText("START (0.00)", startX, H - 8);
 
-        // 6コースのレーン描画
-        const topY = 50;
-        const laneH = 51;
+        const topY = 48;
+        const laneH = 54;
         for (let c = 1; c <= 6; c++) {
           const obj = courseEval[c];
           const yCenter = topY + (c - 0.5) * laneH;
           const yTop = topY + (c - 1) * laneH;
 
-          // レーン背景交互色
-          ctx.fillStyle = c % 2 === 1 ? "rgba(15, 23, 42, 0.45)" : "rgba(30, 41, 59, 0.30)";
-          ctx.fillRect(10, yTop, W - 20, laneH);
+          // コース区切り線
+          ctx.strokeStyle = "rgba(15, 23, 42, 0.15)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(10, yTop + laneH);
+          ctx.lineTo(W - 10, yTop + laneH);
+          ctx.stroke();
 
-          // カド境界線（赤太破線）
+          // カド赤い太破線
           if (c === kadoCourse) {
-            ctx.strokeStyle = "#f43f5e";
-            ctx.lineWidth = 2.5;
-            ctx.setLineDash([8, 5]);
+            ctx.strokeStyle = "#e11d48";
+            ctx.lineWidth = 3;
+            ctx.setLineDash([10, 5]);
             ctx.beginPath();
             ctx.moveTo(10, yTop);
             ctx.lineTo(W - 10, yTop);
             ctx.stroke();
             ctx.setLineDash([]);
-            ctx.fillStyle = "#f43f5e";
-            ctx.font = "bold 10px sans-serif";
+            ctx.fillStyle = "#e11d48";
+            ctx.font = "900 11px sans-serif";
             ctx.textAlign = "left";
-            ctx.fillText(`▼ ${kadoCourse}カド (ダッシュ水域境界)`, 125, yTop + 11);
+            ctx.fillText(`▼ ${kadoCourse}コースカド（ダッシュ境界線）`, 145, yTop + 12);
           }
 
-          // 左端コース表示＋選手名ラベル
-          ctx.fillStyle = c >= kadoCourse ? "#fda4af" : "#cbd5e1";
-          ctx.font = "bold 12px monospace";
-          ctx.textAlign = "left";
-          ctx.fillText(`${c}C ${c >= kadoCourse ? "🔥ダ" : "ス"}`, 16, yCenter + 4);
-
-          // ボートのX位置（先端がexpectedStの位置に来るよう配置）
-          const noseX = stToX(obj.expectedSt);
-          const boatCenterX = noseX - 22;
-          drawBoatShape(ctx, boatCenterX, yCenter, 46, 22, obj.boatId, 0);
-
-          // ボート左側に選手名・展示時計
+          // 左側：コース＋選手名＋展示タイム
           const cleanName = (obj.b.name || `${obj.boatId}号艇`).replace(/\s+/g, "");
-          ctx.fillStyle = "#ffffff";
-          ctx.font = "bold 13px sans-serif";
-          ctx.textAlign = "right";
-          ctx.fillText(`${cleanName} (展${(obj.b.exTime || 6.80).toFixed(2)}s)`, boatCenterX - 34, yCenter + 4);
+          ctx.fillStyle = "#0f172a";
+          ctx.font = "900 14px sans-serif";
+          ctx.textAlign = "left";
+          ctx.fillText(`${c}コース`, 14, yCenter - 5);
+          ctx.font = "bold 12px sans-serif";
+          ctx.fillStyle = c >= kadoCourse ? "#be123c" : "#1e293b";
+          ctx.fillText(`${cleanName} (${(obj.b.exTime || 6.80).toFixed(2)}s)`, 14, yCenter + 13);
 
-          // ボート右側に想定STと1M攻め手バッジ
+          // ボート描画（先端がexpectedStの位置）
+          const noseX = stToX(obj.expectedSt);
+          const boatX = noseX - 35;
+          drawClassicBoatIcon(ctx, boatX, yCenter, 0.66, obj.boatId, 0, 1.0, "");
+
+          // ボート右側にST値と1M戦法バッジ
           const stText = `.${Math.round(obj.expectedSt * 100).toString().padStart(2, "0")}`;
-          let atkLabel = "➡先マイ";
-          let atkColor = "#38bdf8";
-          if (obj.attackType === "makuri") { atkLabel = `⤴まくり(${obj.effMakuriRate.toFixed(0)}%)`; atkColor = "#fb7185"; }
-          else if (obj.attackType === "makurisashi") { atkLabel = `⚡まくり差(${obj.effMsRate.toFixed(0)}%)`; atkColor = "#fbbf24"; }
-          else if (obj.attackType === "sashi") { atkLabel = `📐差し(${obj.effSashiRate.toFixed(0)}%)`; atkColor = "#34d399"; }
-          else if (obj.attackType === "tenkaimachi") { atkLabel = `⏳展開待(${obj.effWaitRate.toFixed(0)}%)`; atkColor = "#c084fc"; }
-          else if (obj.attackType === "sotomai") { atkLabel = "🌀外マイ"; atkColor = "#22d3ee"; }
-          else if (obj.attackType === "hekomi") { atkLabel = "⚠️被弾/壁崩"; atkColor = "#94a3b8"; }
+          let atkLabel = "➡逃げ先マイ";
+          if (obj.attackType === "makuri") atkLabel = `🔥まくり(${obj.effMakuriRate.toFixed(0)}%)`;
+          else if (obj.attackType === "makurisashi") atkLabel = `⚡まくり差(${obj.effMsRate.toFixed(0)}%)`;
+          else if (obj.attackType === "sashi") atkLabel = `📐差し(${obj.effSashiRate.toFixed(0)}%)`;
+          else if (obj.attackType === "tenkaimachi") atkLabel = `⏳展開待(${obj.effWaitRate.toFixed(0)}%)`;
+          else if (obj.attackType === "sotomai") atkLabel = "🌀外マイ";
+          else if (obj.attackType === "hekomi") atkLabel = "⚠️凹み・被弾";
 
-          ctx.fillStyle = "#7dd3fc";
+          ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+          ctx.fillRect(noseX + 8, yCenter - 13, 162, 26);
+          ctx.fillStyle = "#38bdf8";
           ctx.font = "900 13px monospace";
           ctx.textAlign = "left";
-          ctx.fillText(`ST ${stText}`, noseX + 8, yCenter + 4);
-
-          ctx.fillStyle = atkColor;
+          ctx.fillText(`ST${stText}`, noseX + 14, yCenter + 4);
+          ctx.fillStyle = "#ffffff";
           ctx.font = "bold 12px sans-serif";
-          ctx.fillText(atkLabel, noseX + 66, yCenter + 4);
+          ctx.fillText(atkLabel, noseX + 64, yCenter + 4);
         }
+        ctx.restore();
       }
 
+      // 参考画像の構図・6艇同心円アーク・正立ナンバー・2倍Retina高解像度による1マーク展開図
       function drawFirstMarkCanvas(courseEval, kadoCourse, venue, raceNo, raceGrade, windDir, windSpeed, kimariteStats) {
         const canvas = document.getElementById("firstMarkCanvas");
         if (!canvas) return;
+        const W = 920;
+        const H = 640;
+        if (canvas.width !== W * 2 || canvas.height !== H * 2) {
+          canvas.width = W * 2;
+          canvas.height = H * 2;
+        }
         const ctx = canvas.getContext("2d");
-        const W = canvas.width;
-        const H = canvas.height;
+        ctx.save();
+        ctx.scale(2, 2);
 
-        // 1. 水面グラデーション背景
-        const waterGrad = ctx.createRadialGradient(340, 220, 30, 380, 230, 500);
-        waterGrad.addColorStop(0, "#0e3a5c");
-        waterGrad.addColorStop(0.6, "#09223a");
-        waterGrad.addColorStop(1, "#061527");
-        ctx.fillStyle = waterGrad;
+        ctx.fillStyle = "#18d4f2";
         ctx.fillRect(0, 0, W, H);
 
-        // 上部ヘッダー
         ctx.fillStyle = "#0f172a";
-        ctx.fillRect(0, 0, W, 40);
-        ctx.fillStyle = "#fbbf24";
+        ctx.fillRect(0, 0, W, 38);
+        ctx.fillStyle = "#ffffff";
         ctx.font = "bold 15px sans-serif";
         ctx.textAlign = "left";
         const gStr = raceGrade === "ippan" ? "一般" : raceGrade;
-        ctx.fillText(`🌀 ${venue.name} ${raceNo}R (${gStr}) 1マーク（第1ターンマーク）旋回・展開軌道シミュレーション`, 14, 25);
-
-        ctx.fillStyle = "#38bdf8";
-        ctx.font = "bold 12px sans-serif";
+        ctx.fillText(`🌀 ${venue.name} ${raceNo}R (${gStr}) 1マーク（6艇）旋回展開シミュレーション`, 14, 24);
+        ctx.fillStyle = "#fbbf24";
+        ctx.font = "bold 13px sans-serif";
         ctx.textAlign = "right";
-        ctx.fillText(`🟦イン逃げ ${kimariteStats.inEscapePct}% vs 🟥非イン逆転 ${kimariteStats.nonInPct}%`, W - 14, 25);
+        ctx.fillText(`🟦イン逃げ ${kimariteStats.inEscapePct}% ／ 🟥非イン逆転 ${kimariteStats.nonInPct}%`, W - 14, 24);
 
-        // 2. 水面波紋＆1マーク（赤白ターンマークブイ）の描画
-        const buoyX = 310;
-        const buoyY = 235;
+        const buoyX = 390;
+        const buoyY = 305;
 
-        // ターンマーク周囲の波紋
-        [36, 62, 92].forEach(r => {
-          ctx.strokeStyle = "rgba(56, 189, 248, 0.16)";
-          ctx.lineWidth = 1.2;
-          ctx.beginPath();
-          ctx.arc(buoyX, buoyY, r, 0, Math.PI * 2);
-          ctx.stroke();
-        });
-
-        // 1マークブイ本体
-        ctx.fillStyle = "#ef4444";
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(buoyX, buoyY, 15, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
         ctx.fillStyle = "#ffffff";
-        ctx.font = "900 10px sans-serif";
+        ctx.strokeStyle = "#dc2626";
+        ctx.lineWidth = 3.5;
+        ctx.fillRect(42, buoyY - 18, 314, 36);
+        ctx.strokeRect(42, buoyY - 18, 314, 36);
+        ctx.fillStyle = "#1e3a8a";
+        ctx.font = "bold 14px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("1M", buoyX, buoyY + 3.5);
+        ctx.fillText("🎓 ぼーとだいがくせい  @Boatrace__daisu", 199, buoyY + 5);
 
-        // 水面エリア案内ラベル
-        ctx.fillStyle = "rgba(148, 163, 184, 0.55)";
-        ctx.font = "bold 12px sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText("◀ バックストレッチ（1M出口・直線）", 45, 70);
-        ctx.fillText("ホームストレッチ（スリット進入側） ▶", 560, 405);
+        const br = 22;
+        ctx.save();
+        ctx.translate(buoyX, buoyY);
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(0, 0, br, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#ef4444";
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, br, -Math.PI * 0.75, -Math.PI * 0.25);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, br, Math.PI * 0.25, Math.PI * 0.75);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#0f172a";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, br, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
 
-        // 3. 6艇の進入開始点(右) → 1マーク旋回制御点 → 1M出口到達点(左上)の軌道描画
-        const hasMakuriBoat = Object.values(courseEval).find(x => x.attackType === "makuri" && x.courseNo >= 2);
-        if (hasMakuriBoat) {
-          // まくり発生時の白い引き波ゾーン（1Mブイのすぐ上〜左側）
-          ctx.save();
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.32)";
-          ctx.lineWidth = 14;
-          ctx.setLineDash([10, 6]);
-          ctx.beginPath();
-          ctx.arc(buoyX - 10, buoyY - 15, 58, Math.PI * 0.85, Math.PI * 1.65);
-          ctx.stroke();
-          ctx.fillStyle = "#fda4af";
-          ctx.font = "bold 11px sans-serif";
-          ctx.fillText("🌊まくり引き波(被弾域)", buoyX - 95, buoyY - 52);
-          ctx.restore();
-        }
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "900 20px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("1 マーク", buoyX - 52, buoyY + 45);
 
-        // 各コースの軌道パラメータ計算
+        const arr = Object.values(courseEval);
+        const ranked = [...arr].sort((a, b) => (b.firstScore * 0.65 + b.placeScore * 0.35) - (a.firstScore * 0.65 + a.placeScore * 0.35));
+        const rankMap = {};
+        ranked.forEach((item, idx) => { rankMap[item.courseNo] = idx; });
+
+        // ★重要：戦法ごとの旋回レーン（0:最内 〜 5:最外）の決定
+        // 展開待ち（tenkaimachi）は「まくり艇の外を大外で回す」のではなく、「まくり等の隙を突いて内へ切り込む（最内・内目差し）」！
+        const radiusPriority = arr.map(obj => {
+          const c = obj.courseNo;
+          let rScore = 20;
+          if (obj.attackType === "sashi") {
+            rScore = 10 + c;                       // 最内差し（1Cのブイ際を鋭く切り込む）
+          } else if (obj.attackType === "tenkaimachi") {
+            rScore = 16 + c * 1.5;                 // 展開待ち：まくり艇の内側・差し場へ内切り込み！大外は絶対に回さない
+          } else if (c === 1 && obj.attackType === "nige") {
+            rScore = 22;                           // イン先マイ
+          } else if (obj.attackType === "makurisashi") {
+            rScore = 32 + c;                       // まくり差し（中割り）
+          } else if (obj.attackType === "makuri") {
+            rScore = 46 + c;                       // まくり（外包み）
+          } else {
+            rScore = 56 + c;                       // 外マイ（大外追走）
+          }
+          return { c, rScore };
+        }).sort((a, b) => a.rScore - b.rScore);
+
+        const laneMap = {};
+        radiusPriority.forEach((item, idx) => { laneMap[item.c] = idx; }); // 0(最内) 〜 5(最外)
+
+        const boatRenderQueue = [];
+        const tList = [0.56, 0.41, 0.50, 0.58, 0.43, 0.52];
+
         for (let c = 1; c <= 6; c++) {
           const obj = courseEval[c];
           const bColor = BOAT_COLORS[obj.boatId] || BOAT_COLORS[1];
-          const startX = 760 - (0.16 - obj.expectedSt) * 350;
-          const startY = 175 + (c - 1) * 38;
+          const cleanName = (obj.b.name || `${obj.boatId}号艇`).split(" ")[0];
+          const rk = rankMap[c] ?? (c - 1);       // 0 = 1M出口1番手, 5 = 6番手
+          const laneIdx = laneMap[c] ?? (c - 1);  // 0 = 最内レーン, 5 = 最外レーン
 
-          let cp1X = buoyX + 60;
-          let cp1Y = buoyY + 25 + (c - 1) * 14;
-          let cp2X = buoyX - 75;
-          let cp2Y = buoyY - 25;
-          let endX = 165;
-          let endY = 120;
-          let endAngle = -Math.PI * 0.78;
-          let dashed = false;
+          const stOffset = Math.max(-26, Math.min(32, (0.15 - obj.expectedSt) * 400));
+          const startX = 235 + stOffset - (c - 1) * 4;
+          const startY = 374 + (c - 1) * 45;
 
-          if (c === 1 && obj.attackType !== "hekomi") {
-            // イン先マイ軌道
-            cp1X = buoyX + 35; cp1Y = buoyY + 32;
-            cp2X = buoyX - 55; cp2Y = buoyY - 10;
-            endX = 155; endY = 128;
-            endAngle = -Math.PI * 0.82;
-          } else if (obj.attackType === "makuri") {
-            // 豪快な外まくり大外弧軌道
-            cp1X = buoyX + 20; cp1Y = buoyY + 10;
-            cp2X = buoyX - 40; cp2Y = buoyY - 115;
-            endX = 135; endY = 78;
-            endAngle = -Math.PI * 0.90;
-          } else if (obj.attackType === "makurisashi") {
-            // まくり差し（間を割る鋭角S字軌道）
-            cp1X = buoyX + 55; cp1Y = buoyY + 35;
-            cp2X = buoyX - 25; cp2Y = buoyY - 48;
-            endX = 150; endY = 104 + (c - 3) * 14;
-            endAngle = -Math.PI * 0.84;
-          } else if (obj.attackType === "sashi") {
-            // 1Mブイ際を小回りする差し軌道
-            cp1X = buoyX + 65; cp1Y = buoyY + 52;
-            cp2X = buoyX - 15; cp2Y = buoyY + 20;
-            endX = 175; endY = 162 + (c - 2) * 16;
-            endAngle = -Math.PI * 0.76;
-          } else if (obj.attackType === "tenkaimachi") {
-            // 最内ブイ下を冷静に拾う展開待ち軌道
-            cp1X = buoyX + 75; cp1Y = buoyY + 75;
-            cp2X = buoyX + 5; cp2Y = buoyY + 45;
-            endX = 205; endY = 195 + (c - 4) * 20;
-            endAngle = -Math.PI * 0.72;
-          } else if (obj.attackType === "hekomi") {
-            // 引き波被弾・外流れ点線軌道
-            cp1X = buoyX + 30; cp1Y = buoyY + 20;
-            cp2X = buoyX - 110; cp2Y = buoyY - 90;
-            endX = 250; endY = 72 + c * 10;
-            endAngle = -Math.PI * 0.65;
-            dashed = true;
+          const endAngle = -Math.PI * (0.90 - laneIdx * 0.018);
+
+          const leadAdvance = (2.5 - rk) * 18;
+          const baseExitX = 490 + laneIdx * 56;
+          const baseExitY = 248 - laneIdx * 35;
+          const endX = baseExitX + Math.cos(endAngle) * leadAdvance;
+          const endY = baseExitY + Math.sin(endAngle) * leadAdvance;
+
+          const p0x = startX + 34;
+          const p0y = startY;
+          const sternDist = 34;
+          const p3x = endX - Math.cos(endAngle) * sternDist;
+          const p3y = endY - Math.sin(endAngle) * sternDist;
+
+          // ★展開待ちの場合の制御点：
+          // 展開待ちは外へ大きく膨らまず、まくり艇の内側スペースを狙って早めに内へ切り込む！
+          let cp1x, cp1y, cp2x, cp2y;
+          if (obj.attackType === "tenkaimachi") {
+            // 進入はコース位置から直進しつつ、1マーク手前で内側（laneIdx）へ向けて鋭角に切れ込む
+            cp1x = 510 + laneIdx * 45;
+            cp1y = startY - 25 - (c - 1) * 4;
+            cp2x = 520 + laneIdx * 48;
+            cp2y = endY + 35 + laneIdx * 6;
           } else {
-            // 外マイ追走
-            cp1X = buoyX + 30; cp1Y = buoyY + 25;
-            cp2X = buoyX - 95; cp2Y = buoyY - 85;
-            endX = 215; endY = 92 + c * 8;
-            endAngle = -Math.PI * 0.85;
+            const entryBulgeX = 545 + (c - 1) * 54;
+            const exitBulgeX = 555 + laneIdx * 56;
+            cp1x = entryBulgeX;
+            cp1y = startY - 4 - (c - 1) * 6;
+            cp2x = exitBulgeX + 22;
+            cp2y = endY + 28 + laneIdx * 8;
           }
 
-          // 軌道ラインの描画
-          ctx.save();
-          ctx.strokeStyle = bColor.accent;
-          ctx.lineWidth = (obj.attackType === "makuri" || (c === 1 && obj.attackType === "nige")) ? 3.5 : 2.4;
-          if (dashed) ctx.setLineDash([5, 5]);
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
-          ctx.stroke();
-          ctx.restore();
+          const t = tList[c - 1] || 0.50;
+          const mt = 1 - t;
+          const midX = mt*mt*mt*p0x + 3*mt*mt*t*cp1x + 3*mt*t*t*cp2x + t*t*t*p3x;
+          const midY = mt*mt*mt*p0y + 3*mt*mt*t*cp1y + 3*mt*t*t*cp2y + t*t*t*p3y;
+          const dxdt = 3*mt*mt*(cp1x - p0x) + 6*mt*t*(cp2x - cp1x) + 3*t*t*(p3x - cp2x);
+          const dydt = 3*mt*mt*(cp1y - p0y) + 6*mt*t*(cp2y - cp1y) + 3*t*t*(p3y - cp2y);
+          const midAngle = Math.atan2(dydt, dxdt);
 
-          // スリット側スタート地点の小バッジ
-          ctx.fillStyle = bColor.fill;
-          ctx.beginPath();
-          ctx.arc(startX, startY, 9, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = bColor.text;
-          ctx.font = "bold 10px sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText(String(obj.boatId), startX, startY + 3.5);
+          let atkShort = "先マイ";
+          if (obj.attackType === "makuri") atkShort = "まくり";
+          else if (obj.attackType === "makurisashi") atkShort = "まくり差";
+          else if (obj.attackType === "sashi") atkShort = "差し";
+          else if (obj.attackType === "tenkaimachi") atkShort = "展開待(内差)";
+          else if (obj.attackType === "sotomai") atkShort = "外マイ";
 
-          // 1M出口到達地点のボート＆選手名ラベル描画
-          drawBoatShape(ctx, endX, endY, 40, 19, obj.boatId, endAngle);
-
-          const cleanName = (obj.b.name || `${obj.boatId}号艇`).split(" ")[0];
-          const roleShort = obj.roleText.replace(/🎯指定:/g, "");
-          ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
-          ctx.strokeStyle = bColor.stroke;
-          ctx.lineWidth = 1.2;
-          const labelText = `${obj.boatId}.${cleanName} [${roleShort}]`;
-          ctx.font = "bold 11px sans-serif";
-          const tw = ctx.measureText(labelText).width + 10;
-          ctx.fillRect(endX - tw - 18, endY - 10, tw, 20);
-          ctx.strokeRect(endX - tw - 18, endY - 10, tw, 20);
-          ctx.fillStyle = "#f8fafc";
-          ctx.textAlign = "right";
-          ctx.fillText(labelText, endX - 23, endY + 4);
+          boatRenderQueue.push({
+            c,
+            boatId: obj.boatId,
+            bColor,
+            cleanName,
+            atkShort,
+            rk,
+            laneIdx,
+            startX,
+            startY,
+            p0x,
+            p0y,
+            cp1x,
+            cp1y,
+            cp2x,
+            cp2y,
+            p3x,
+            p3y,
+            midX,
+            midY,
+            midAngle,
+            endX,
+            endY,
+            endAngle
+          });
         }
 
-        // 4. 下部フッター（2パターン結論＆クレジット）
-        ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
-        ctx.fillRect(0, H - 36, W, 36);
-        ctx.fillStyle = "#e2e8f0";
-        ctx.font = "bold 12px sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText(`🎓 ぼーとだいがくせい (@Boatrace__daisu) ｜ 1M展開軌道＆スジ連動シミュレーション`, 14, H - 13);
+        boatRenderQueue.forEach(item => {
+          ctx.save();
+          if (item.boatId === 1 || item.boatId === 5) {
+            ctx.strokeStyle = "rgba(15, 23, 42, 0.45)";
+            ctx.lineWidth = 6.2;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(item.p0x, item.p0y);
+            ctx.bezierCurveTo(item.cp1x, item.cp1y, item.cp2x, item.cp2y, item.p3x, item.p3y);
+            ctx.stroke();
+          }
+          ctx.strokeStyle = item.bColor.line;
+          ctx.lineWidth = 4.2;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(item.p0x, item.p0y);
+          ctx.bezierCurveTo(item.cp1x, item.cp1y, item.cp2x, item.cp2y, item.p3x, item.p3y);
+          ctx.stroke();
+          ctx.restore();
+        });
+
+        boatRenderQueue.forEach(item => {
+          drawClassicBoatIcon(ctx, item.startX, item.startY, 0.66, item.boatId, 0, 1.0, "");
+          ctx.fillStyle = "#0f172a";
+          ctx.font = "900 13px sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText(`${item.c}C ${item.cleanName} (${item.atkShort})`, item.startX - 42, item.startY + 4);
+        });
+
+        boatRenderQueue.forEach(item => {
+          drawClassicBoatIcon(ctx, item.midX, item.midY, 0.62, item.boatId, item.midAngle, 0.40, "");
+        });
+
+        const rankCircles = ["①", "②", "③", "④", "⑤", "⑥"];
+        boatRenderQueue.forEach(item => {
+          drawClassicBoatIcon(ctx, item.endX, item.endY, 0.68, item.boatId, item.endAngle, 1.0, item.cleanName, rankCircles[item.rk] || "");
+        });
+  ctx.restore();
       }
 
       function showImageToast(msg) {
@@ -5175,7 +5266,7 @@ def main():
     else:
         json_payload = json.dumps(st.session_state["server_race_data"], ensure_ascii=False)
         rendered_html = ULTIMATE_HTML_TEMPLATE.replace("__INJECTED_SERVER_DATA__", json_payload)
-        components.html(rendered_html, height=2350, scrolling=True)
+        components.html(rendered_html, height=2750, scrolling=True)
 
 
 if __name__ == "__main__":
