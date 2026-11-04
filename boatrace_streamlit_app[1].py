@@ -218,10 +218,10 @@ def estimate_course_attack_rates(boat_no: int, win_rate: float, bi_rate: float, 
     skill = max(0.55, min(1.45, win_rate / 6.10))
     st_boost = max(0.75, min(1.35, (0.17 - avg_st) * 8.0 + 1.0))
 
-    base_sashi = {1: 3.5, 2: 14.2, 3: 3.8, 4: 3.2, 5: 1.6, 6: 1.0}[boat_no]
-    base_makuri = {1: 68.0, 2: 5.4, 3: 8.2, 4: 7.8, 5: 2.4, 6: 1.0}[boat_no]
-    base_ms = {1: 0.5, 2: 1.2, 3: 7.2, 4: 6.4, 5: 6.8, 6: 2.6}[boat_no]
-    base_wait = {1: 18.0, 2: 46.0, 3: 44.0, 4: 45.0, 5: 42.0, 6: 31.0}[boat_no]
+    base_sashi = {1: 3.5, 2: 15.6, 3: 4.8, 4: 6.5, 5: 2.2, 6: 1.5}[boat_no]
+    base_makuri = {1: 68.0, 2: 5.2, 3: 8.4, 4: 9.2, 5: 2.6, 6: 1.2}[boat_no]
+    base_ms = {1: 0.5, 2: 1.5, 3: 9.6, 4: 8.8, 5: 8.5, 6: 3.4}[boat_no]
+    base_wait = {1: 18.0, 2: 48.0, 3: 46.0, 4: 48.0, 5: 46.0, 6: 36.0}[boat_no]
 
     sashi_r = round(min(45.0, max(0.5, base_sashi * skill)), 1)
     makuri_r = round(min(92.0 if boat_no == 1 else 38.0, max(0.5, base_makuri * skill * (1.0 if boat_no == 1 else st_boost))), 1)
@@ -915,28 +915,38 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           </div>
 
           
-          <!-- 🎯 ③ 手動戦術・展開指定パネル（全6コースの攻め手を自由に選択） -->
+          <!-- 🎯 ③ 過去レース展開分析 ＆ 6コース連動戦術パネル -->
           <div class="bg-slate-900 border-2 border-pink-500/50 rounded-xl p-3 space-y-2.5 shadow-lg">
             <div class="flex flex-wrap items-center justify-between gap-1 border-b border-slate-800 pb-1.5">
               <div class="flex items-center gap-2">
                 <span class="text-base">🎯</span>
                 <div>
-                  <h2 class="text-xs font-bold text-pink-300">③ 手動戦術・展開指定パネル（全6コースの攻め手を自由に選択）</h2>
-                  <span class="text-[10px] text-slate-400">「この艇がまくったら？」「インが逃げたら？」「差し抜けたら？」をワンクリックで自在に設定・シミュレート</span>
+                  <h2 class="text-xs font-bold text-pink-300">③ 過去レース展開分析 ＆ 6コース連動戦術パネル</h2>
+                  <span class="text-[10px] text-slate-400">過去レース統計（会場×風×ST段差×選手決まり手履歴）から6艇が矛盾なく連動する1M展開を分析・指定</span>
                 </div>
               </div>
-              <div class="flex flex-wrap gap-1 text-[11px]">
-                <button type="button" onclick="setTacticsPreset('in_nige')" class="bg-sky-950 hover:bg-sky-900 text-sky-300 border border-sky-700/60 px-2 py-0.5 rounded font-bold">🛡️ イン逃げ鉄板</button>
-                <button type="button" onclick="setTacticsPreset('c2_sashi')" class="bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60 px-2 py-0.5 rounded font-bold">📐 2C差し逆転</button>
-                <button type="button" onclick="setTacticsPreset('c2_makuri')" class="bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700/60 px-2 py-0.5 rounded font-bold">🔥 2Cジカまくり</button>
-                <button type="button" onclick="setTacticsPreset('c3_attack')" class="bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700/60 px-2 py-0.5 rounded font-bold">⚡ 3Cまくり差し</button>
-                <button type="button" onclick="setTacticsPreset('c4_makuri')" class="bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-700/60 px-2 py-0.5 rounded font-bold">🔥 4カド一撃</button>
-                <button type="button" onclick="setTacticsPreset('out_wait')" class="bg-teal-950 hover:bg-teal-900 text-teal-300 border border-teal-700/60 px-2 py-0.5 rounded font-bold">⏳ 5・6C展開待ち波乱</button>
-                <button type="button" onclick="setTacticsPreset('reset')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2 py-0.5 rounded">🔄 全てAI自動にリセット</button>
-              </div>
+              <label class="flex items-center gap-1.5 text-[11px] bg-slate-950 border border-pink-500/40 px-2 py-1 rounded cursor-pointer text-pink-200 font-bold">
+                <input type="checkbox" id="chkAutoCoupleTactics" checked />
+                🔗 1艇変更時に他艇もセオリー連動
+              </label>
             </div>
 
-            <!-- コース別戦術セレクター（1C〜6Cが横並びで即座に選べる！） -->
+            <!-- 📊 過去レース分析から導いた推奨展開シナリオ TOP3 -->
+            <div id="pastRaceScenarioTop3Box" class="bg-slate-950/90 border border-slate-800 rounded-lg p-2 space-y-1.5 text-xs"></div>
+
+            <!-- ワンクリック6艇完全連動プリセット -->
+            <div class="flex flex-wrap gap-1 text-[11px]">
+              <button type="button" onclick="setTacticsPreset('in_nige')" class="bg-sky-950 hover:bg-sky-900 text-sky-300 border border-sky-700/60 px-2 py-0.5 rounded font-bold">🛡️ イン先マイ王道</button>
+              <button type="button" onclick="setTacticsPreset('c2_sashi')" class="bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60 px-2 py-0.5 rounded font-bold">📐 2C差し切り逆転</button>
+              <button type="button" onclick="setTacticsPreset('c2_makuri')" class="bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700/60 px-2 py-0.5 rounded font-bold">🔥 2Cジカまくり</button>
+              <button type="button" onclick="setTacticsPreset('c3_attack')" class="bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700/60 px-2 py-0.5 rounded font-bold">⚡ 3Cまくり差し</button>
+              <button type="button" onclick="setTacticsPreset('c3_makuri')" class="bg-orange-950 hover:bg-orange-900 text-orange-300 border border-orange-700/60 px-2 py-0.5 rounded font-bold">🔥 3Cツケマイ攻め</button>
+              <button type="button" onclick="setTacticsPreset('c4_makuri')" class="bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-700/60 px-2 py-0.5 rounded font-bold">🔥 4カドまくり一撃</button>
+              <button type="button" onclick="setTacticsPreset('out_wait')" class="bg-teal-950 hover:bg-teal-900 text-teal-300 border border-teal-700/60 px-2 py-0.5 rounded font-bold">💥 1Mやり合い展開待ち</button>
+              <button type="button" onclick="setTacticsPreset('reset')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2 py-0.5 rounded">🔄 過去レースAI自動に戻す</button>
+            </div>
+
+            <!-- コース別戦術セレクター（1C〜6C） -->
             <div class="grid grid-cols-2 sm:grid-cols-6 gap-2" id="courseTacticsControlGrid"></div>
           </div>
 
@@ -2812,10 +2822,10 @@ const UIManager = {
         // コース別攻め方成功率（差し率・まくり率・まくり差し率・展開待ち連対率）
         const skill = Math.max(0.55, Math.min(1.45, winRate / 6.1));
         const stBoost = Math.max(0.75, Math.min(1.35, (0.17 - avgSt) * 8.0 + 1.0));
-        const baseSashi = { 1: 3.5, 2: 14.2, 3: 3.8, 4: 3.2, 5: 1.6, 6: 1.0 }[id] || 3.0;
-        const baseMakuri = { 1: 68.0, 2: 5.4, 3: 8.2, 4: 7.8, 5: 2.4, 6: 1.0 }[id] || 4.0;
-        const baseMs = { 1: 0.5, 2: 1.2, 3: 7.2, 4: 6.4, 5: 6.8, 6: 2.6 }[id] || 3.0;
-        const baseWait = { 1: 18.0, 2: 46.0, 3: 44.0, 4: 45.0, 5: 42.0, 6: 31.0 }[id] || 35.0;
+        const baseSashi = { 1: 3.5, 2: 15.6, 3: 4.8, 4: 6.5, 5: 2.2, 6: 1.5 }[id] || 3.0;
+        const baseMakuri = { 1: 68.0, 2: 5.2, 3: 8.4, 4: 9.2, 5: 2.6, 6: 1.2 }[id] || 4.0;
+        const baseMs = { 1: 0.5, 2: 1.5, 3: 9.6, 4: 8.8, 5: 8.5, 6: 3.4 }[id] || 3.0;
+        const baseWait = { 1: 18.0, 2: 48.0, 3: 46.0, 4: 48.0, 5: 46.0, 6: 36.0 }[id] || 35.0;
 
         const sashiRate = Math.round(Math.min(45.0, Math.max(0.5, baseSashi * skill)) * 10) / 10;
         const makuriRate = Math.round(Math.min(id === 1 ? 92.0 : 38.0, Math.max(0.5, baseMakuri * skill * (id === 1 ? 1.0 : stBoost))) * 10) / 10;
@@ -3673,150 +3683,117 @@ const UIManager = {
           courseEval[1].firstScore += (c2Boat.nigashi - 52.0) * 0.45 * cw.wc - (af.fCount ? c2Boat.fCount * 9 : 0);
         }
 
-        // 2コースのジカまくり vs 差し判定（2コースまくり率が高い、または1Cよりスリット優勢時）
-        if (courseEval[2].b.manualTactic === "auto") {
-          if (courseEval[2].effMakuriRate >= courseEval[2].effSashiRate + 2.0 || (courseEval[2].slitPower - courseEval[1].slitPower >= 10 && courseEval[2].effMakuriRate >= 8.0)) {
-            courseEval[2].firstScore += (12 + vMakuriMod) * cw.ws;
-            courseEval[2].roleText = `🔥2Cまくり(${courseEval[2].effMakuriRate.toFixed(1)}%)`;
-            courseEval[2].attackType = "makuri";
-            courseEval[1].firstScore -= 10 * cw.ws;
-            if (courseEval[3].b.manualTactic === "auto") {
-              courseEval[3].firstScore += (10 + vSashiMod) * cw.ws;
-              courseEval[3].placeScore += 18 * cw.ws;
-              courseEval[3].roleText = "📐2C捲り連動差";
-              courseEval[3].attackType = "sashi";
-            }
+        // =========================================================
+        // 📊 過去レース統計（会場特性×蓄積DB×風潮×ST段差×選手過去決まり手）
+        // から導く「6艇整合1マーク展開シナリオ分析」
+        // =========================================================
+        const c1 = courseEval[1], c2 = courseEval[2], c3 = courseEval[3], c4 = courseEval[4], c5 = courseEval[5], c6 = courseEval[6];
+        const kadoObj = courseEval[kadoCourse] || c4;
+        const receiverObj = courseEval[Math.max(1, kadoCourse - 1)] || c3;
+
+        let logs = [];
+        try {
+          logs = JSON.parse(localStorage.getItem("BOATRACE_REVIEW_LOGS") || "[]");
+        } catch (e) {}
+        const venueLogs = logs.filter(x => x.venue === venue.name);
+        const targetLogs = venueLogs.length >= 3 ? venueLogs : logs;
+        const logTotal = targetLogs.length;
+        const logMakuriRatio = logTotal > 0 ? targetLogs.filter(x => ["center_makuri_atk", "c2_makuri_atk"].includes(x.firstMarkPat) || x.kimarite === "makuri").length / logTotal : 0.20;
+        const logSashiRatio = logTotal > 0 ? targetLogs.filter(x => ["in_flow", "c2_sashi_atk"].includes(x.firstMarkPat) || x.kimarite === "sashi").length / logTotal : 0.22;
+        const logClashRatio = logTotal > 0 ? targetLogs.filter(x => x.firstMarkPat === "clash_wait" || (x.dochuType && x.dochuType !== "none")).length / logTotal : 0.15;
+
+        const stDiff2over1 = c1.expectedSt - c2.expectedSt;
+        const stDiff3over2 = c2.expectedSt - c3.expectedSt;
+        const stDiffKado = receiverObj.expectedSt - kadoObj.expectedSt;
+
+        const scWeights = {
+          in_nige: Math.max(15, c1.effMakuriRate * 1.15 + (c2.b.nigashi - 50) * 0.4 + (stDiffKado < 0.02 ? 12 : -10) + vInMod),
+          c2_sashi: Math.max(8, c2.effSashiRate * 1.7 + (windDir === "tail" ? windSpeed * 2.5 : 0) + (deepIn !== "normal" ? 8 : 0) + vSashiMod + logSashiRatio * 20),
+          c3_ms: Math.max(8, c3.effMsRate * 1.85 + (c3.b.visTurn * 4) + (windDir === "head" ? windSpeed * 1.5 : 0) + vSashiMod * 0.6),
+          c3_makuri: Math.max(5, c3.effMakuriRate * 1.4 + (stDiff3over2 >= 0.02 ? 22 : -6) + (c3.b.exTimeRank === 1 ? 8 : 0) + vMakuriMod),
+          c4_makuri: Math.max(6, kadoObj.effMakuriRate * 1.5 + (stDiffKado >= 0.025 ? 28 : -8) + (kadoObj.b.exTimeRank === 1 ? 8 : 0) + (deepIn === "deep" ? 12 : 0) + vMakuriMod + logMakuriRatio * 20),
+          clash_wait: Math.max(5, (c5.effWaitRate + c6.effWaitRate) * 0.18 + ((stDiff3over2 >= 0.02 || stDiffKado >= 0.02) && c1.expectedSt <= 0.13 ? 18 : 0) + logClashRatio * 25)
+        };
+        const scTotal = Object.values(scWeights).reduce((a, b) => a + b, 0);
+
+        const scenarioCatalog = [
+          {
+            key: "in_nige",
+            name: "🛡️ イン先マイ・王道隊形",
+            pct: Math.round((scWeights.in_nige / scTotal) * 100),
+            desc: `1C${c1.b.name}が先マイ押し切り。2C${c2.b.name}がブイ際差し、3C${c3.b.name}が${c3.effMsRate >= c3.effMakuriRate ? "まくり差し" : "外マイ追走"}、4C${c4.b.name}が二番差しで追走する過去最多の基本形。`,
+            plan: { 1: "nige", 2: "sashi", 3: (c3.effMsRate >= c3.effMakuriRate ? "makurisashi" : "sotomai"), 4: "sashi", 5: "makurisashi", 6: "tenkaimachi" }
+          },
+          {
+            key: "c2_sashi",
+            name: "📐 イン膨らみ・2C差し切り展開",
+            pct: Math.round((scWeights.c2_sashi / scTotal) * 100),
+            desc: `1Cが風・波で僅かに膨らんだ懐を2C${c2.b.name}(差し率${c2.effSashiRate.toFixed(1)}%)が鋭く差し抜ける展開。1Cが2・3着に残り、4C二番差しが連動。`,
+            plan: { 1: "nige", 2: "sashi", 3: "sotomai", 4: "sashi", 5: "makurisashi", 6: "tenkaimachi" }
+          },
+          {
+            key: "c3_attack",
+            name: "⚡ 3コースまくり差し強襲展開",
+            pct: Math.round((scWeights.c3_ms / scTotal) * 100),
+            desc: `3C${c3.b.name}(捲差率${c3.effMsRate.toFixed(1)}%)が1Cと2Cの間を鋭く割るスピード旋回。1Cが内粘り、5Cが外から連動浮上。`,
+            plan: { 1: "nige", 2: "sashi", 3: "makurisashi", 4: "sashi", 5: "makurisashi", 6: "tenkaimachi" }
+          },
+          {
+            key: "c4_makuri",
+            name: `🔥 ${kadoCourse}カドまくり一撃（壁崩壊）展開`,
+            pct: Math.round((scWeights.c4_makuri / scTotal) * 100),
+            desc: `カド受け${kadoCourse - 1}Cの遅れを突いて${kadoCourse}C${kadoObj.b.name}がスリット主導権から絞りまくり！内枠が被弾し、外隣5Cのまくり差し＆6C最内差しが連動。`,
+            plan: { 1: "hekomi", 2: "hekomi", 3: "hekomi", 4: "makuri", 5: "makurisashi", 6: "tenkaimachi" }
+          },
+          {
+            key: "c3_makuri",
+            name: "🔥 3コースツケマイ・まくり展開",
+            pct: Math.round((scWeights.c3_makuri / scTotal) * 100),
+            desc: `2Cの凹みまたは3C${c3.b.name}の好STから1Mを握ってツケマイ敢行！インが抵抗して流れる懐を4C差し・5Cまくり差しが突く展開。`,
+            plan: { 1: "hekomi", 2: "hekomi", 3: "makuri", 4: "sashi", 5: "makurisashi", 6: "tenkaimachi" }
+          },
+          {
+            key: "out_wait",
+            name: "💥 1Mやり合い・外枠展開待ち波乱",
+            pct: Math.max(4, 100 - Math.round((scWeights.in_nige / scTotal) * 100) - Math.round((scWeights.c2_sashi / scTotal) * 100) - Math.round((scWeights.c3_ms / scTotal) * 100) - Math.round((scWeights.c4_makuri / scTotal) * 100) - Math.round((scWeights.c3_makuri / scTotal) * 100)),
+            desc: `1Cとセンター攻め艇が1Mで激しくやり合って大外へ流れ、ガラ空きになった最内ブイ際を5C・6Cが展開待ち差しで突き抜ける高配当パターン。`,
+            plan: { 1: "nige", 2: "hekomi", 3: "makuri", 4: "sashi", 5: "tenkaimachi", 6: "tenkaimachi" }
           }
-        }
+        ].sort((a, b) => b.pct - a.pct);
 
         let kadoMakuriTrigger = false;
-        if (kadoCourse >= 3 && kadoCourse <= 6) {
-          const kadoObj = courseEval[kadoCourse];
-          const receiverObj = courseEval[kadoCourse - 1];
-          if ((kadoObj.slitPower - receiverObj.slitPower >= 11 || kadoObj.effMakuriRate >= 14.0) && kadoObj.b.manualTactic === "auto") {
-            kadoMakuriTrigger = true;
-            const fPen = (af.fCount && kadoObj.b.fCount > 0) ? 0.55 : 1.0;
-            kadoObj.firstScore += (16 + vMakuriMod) * fPen * cw.ws;
-            if (kadoObj.effMsRate > kadoObj.effMakuriRate + 2.0) {
-              kadoObj.roleText = `⚡カド捲差(${kadoObj.effMsRate.toFixed(1)}%)`;
-              kadoObj.attackType = "makurisashi";
-            } else {
-              kadoObj.roleText = kadoObj.b.fCount > 0 ? "🔥カド攻(F持)" : `🔥カドまくり(${kadoObj.effMakuriRate.toFixed(1)}%)`;
-              kadoObj.attackType = "makuri";
-            }
-            receiverObj.firstScore -= 12 * cw.ws;
-            receiverObj.placeScore -= 10 * cw.ws;
-            receiverObj.roleText = "⚠️壁崩壊・被弾";
-            receiverObj.attackType = "hekomi";
+        let primaryScenario = scenarioCatalog[0];
+        if (stDiffKado >= 0.025 && (kadoObj.slitPower - receiverObj.slitPower >= 11) && kadoObj.effMakuriRate >= 12.0) {
+          kadoMakuriTrigger = true;
+          primaryScenario = scenarioCatalog.find(s => s.key === "c4_makuri") || scenarioCatalog[0];
+        } else if (primaryScenario.key === "c4_makuri" && stDiffKado < 0.02) {
+          primaryScenario = scenarioCatalog[1] || scenarioCatalog[0];
+        }
 
-            if (courseEval[kadoCourse + 1]) {
-              const outerObj = courseEval[kadoCourse + 1];
-              outerObj.firstScore += (12 + vSashiMod) * cw.ws;
-              outerObj.placeScore += (22 + (af.nigashiTri ? outerObj.b.nigashiTri * 0.22 : 10) + (af.vis ? outerObj.b.visTurn * 6 : 0)) * cw.ws;
-              outerObj.roleText = "⚡まくり差し連動";
-              outerObj.attackType = "makurisashi";
-            }
-            if (courseEval[kadoCourse + 2]) {
-              const waitObj = courseEval[kadoCourse + 2];
-              waitObj.firstScore += (7 + vSashiMod * 0.6) * cw.ws;
-              waitObj.placeScore += 18 * cw.ws;
-              waitObj.roleText = "⏳展開待ち浮上";
-              waitObj.attackType = "tenkaimachi";
-            }
-          }
+        const top3Box = document.getElementById("pastRaceScenarioTop3Box");
+        if (top3Box) {
+          const logNote = logTotal > 0 ? `蓄積DB ${logTotal}R ＋ ` : "";
+          top3Box.innerHTML = `
+            <div class="flex items-center justify-between text-[11px] text-amber-300 font-bold">
+              <span>📊 過去レース分析（${logNote}${venue.name}過去統計×ST段差×選手決まり手履歴）による展開予測 TOP3</span>
+              <span class="text-[10px] text-slate-400">クリックで6艇に一括セット</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+              ${scenarioCatalog.slice(0, 3).map((sc, i) => `
+                <div onclick="setTacticsPreset('${sc.key}')" class="cursor-pointer bg-slate-900 hover:bg-slate-800 border ${i === 0 ? "border-amber-500/60" : "border-slate-700"} rounded p-2 transition">
+                  <div class="flex items-center justify-between font-bold text-[11px] ${i === 0 ? "text-amber-300" : "text-sky-300"}">
+                    <span>#${i + 1} ${sc.name}</span>
+                    <span class="font-mono bg-slate-950 px-1.5 py-0.5 rounded">${sc.pct}%</span>
+                  </div>
+                  <p class="text-[10px] text-slate-300 mt-1 leading-snug">${sc.desc}</p>
+                </div>
+              `).join("")}
+            </div>
+          `;
         }
 
         const manualNotes = [];
         let hasActiveMakuri = kadoMakuriTrigger;
-        for (let c = 1; c <= 6; c++) {
-          if (["makuri", "hekomi"].includes(courseEval[c].b.manualTactic)) hasActiveMakuri = true;
-        }
-
-        for (let c = 1; c <= 6; c++) {
-          const obj = courseEval[c];
-          const tac = obj.b.manualTactic;
-          if (tac === "auto") continue;
-          obj.attackType = tac;
-
-          if (tac === "nige") {
-            obj.firstScore += 32 * cw.ws;
-            obj.placeScore += 15 * cw.ws;
-            obj.roleText = "🎯指定:逃げ";
-            manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【逃げ(先マイ)】を指定`);
-          } else if (tac === "sashi") {
-            obj.firstScore += (22 + vSashiMod) * cw.ws;
-            obj.placeScore += 28 * cw.ws;
-            obj.roleText = `🎯指定:差し(${obj.effSashiRate.toFixed(1)}%)`;
-            manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【1M差し】を指定 → ターンマーク際を鋭く差し抜け`);
-            if (courseEval[1] && c >= 2) {
-              courseEval[1].placeScore += 12 * cw.ws;
-            }
-          } else if (tac === "makuri") {
-            obj.firstScore += (36 + vMakuriMod) * cw.ws;
-            obj.placeScore += 16 * cw.ws;
-            obj.roleText = `🎯指定:まくり(${obj.effMakuriRate.toFixed(1)}%)`;
-            manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【まくり】を指定 → 内枠被弾＆${c < 6 ? c + 1 + "コース以下が展開連動" : "外連動"}`);
-            for (let inner = 1; inner < c; inner++) {
-              courseEval[inner].firstScore -= (inner === c - 1 ? 22 : 16) * cw.ws;
-              courseEval[inner].placeScore -= (inner === c - 1 ? 16 : 10) * cw.ws;
-              if (courseEval[inner].b.manualTactic === "auto") {
-                courseEval[inner].roleText = "⚠️被弾・引き波";
-                courseEval[inner].attackType = "hekomi";
-              }
-            }
-            if (courseEval[c + 1] && courseEval[c + 1].b.manualTactic === "auto") {
-              courseEval[c + 1].firstScore += (15 + vSashiMod) * cw.ws;
-              courseEval[c + 1].placeScore += 28 * cw.ws;
-              courseEval[c + 1].roleText = "⚡まくり差し連動";
-              courseEval[c + 1].attackType = "makurisashi";
-            }
-            if (courseEval[c + 2] && courseEval[c + 2].b.manualTactic === "auto") {
-              courseEval[c + 2].firstScore += (8 + vSashiMod) * cw.ws;
-              courseEval[c + 2].placeScore += 20 * cw.ws;
-              courseEval[c + 2].roleText = "⏳展開待ち浮上";
-              courseEval[c + 2].attackType = "tenkaimachi";
-            }
-          } else if (tac === "makurisashi") {
-            obj.firstScore += (28 + vSashiMod) * cw.ws;
-            obj.placeScore += 26 * cw.ws;
-            obj.roleText = `🎯指定:捲差(${obj.effMsRate.toFixed(1)}%)`;
-            manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【まくり差し】を指定`);
-            if (courseEval[c - 1] && c > 2) {
-              courseEval[c - 1].firstScore -= 12 * cw.ws;
-              courseEval[c - 1].placeScore -= 8 * cw.ws;
-            }
-            if (courseEval[1] && courseEval[1].b.manualTactic === "auto") courseEval[1].placeScore += 10;
-          } else if (tac === "tenkaimachi") {
-            const clashBoost = hasActiveMakuri ? 14 : 6;
-            obj.firstScore += (12 + vSashiMod + clashBoost) * cw.ws;
-            obj.placeScore += (32 + clashBoost * 0.8) * cw.ws;
-            obj.roleText = `🎯指定:展開待(${obj.effWaitRate.toFixed(0)}%)`;
-            manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【展開待ち(最内・連動差し)】を指定 → 1Mもつれ・引き波を突いて上位浮上`);
-          } else if (tac === "sotomai") {
-            obj.firstScore += 8 * cw.ws;
-            obj.placeScore += 24 * cw.ws;
-            obj.roleText = "🎯指定:外マイ";
-            manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【外マイ追走】を指定`);
-          } else if (tac === "hekomi") {
-            obj.firstScore -= 30 * cw.ws;
-            obj.placeScore -= 25 * cw.ws;
-            obj.roleText = "🎯指定:凹み壁崩壊";
-            manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【壁崩壊】を指定 → ${c < 6 ? c + 1 + "コース攻め発動" : ""}`);
-            if (courseEval[c + 1] && courseEval[c + 1].b.manualTactic === "auto") {
-              courseEval[c + 1].firstScore += (24 + vMakuriMod) * cw.ws;
-              courseEval[c + 1].placeScore += 15 * cw.ws;
-              courseEval[c + 1].roleText = "🔥壁崩壊まくり";
-              courseEval[c + 1].attackType = "makuri";
-              if (courseEval[c + 2] && courseEval[c + 2].b.manualTactic === "auto") {
-                courseEval[c + 2].placeScore += 22 * cw.ws;
-                courseEval[c + 2].roleText = "⏳展開待ち連動";
-                courseEval[c + 2].attackType = "tenkaimachi";
-              }
-            }
-          }
-        }
-
-        // AI自動判定（コース別の差し率・まくり率・まくり差し率・展開待ち率のうち最も高い武器を自動選択）
         for (let c = 1; c <= 6; c++) {
           const obj = courseEval[c];
           if (c >= 2) {
@@ -3826,41 +3803,60 @@ const UIManager = {
               obj.placeScore -= 10;
             }
           }
-          if (obj.roleText === "標準") {
-            if (c === 1) {
-              obj.roleText = `🛡️イン先マイ(${obj.effMakuriRate.toFixed(0)}%)`;
-              obj.attackType = "nige";
-            } else if (c === 2) {
-              if (obj.effMakuriRate > obj.effSashiRate) {
-                obj.roleText = `🔥2Cまくり(${obj.effMakuriRate.toFixed(1)}%)`;
-                obj.attackType = "makuri";
-              } else {
-                obj.roleText = `📐2C差し(${obj.effSashiRate.toFixed(1)}%)`;
-                obj.attackType = "sashi";
-              }
-            } else if (c === 3 || c === 4) {
-              if (obj.effMakuriRate >= obj.effMsRate && obj.effMakuriRate >= obj.effSashiRate) {
-                obj.roleText = `🔥${c}Cまくり(${obj.effMakuriRate.toFixed(1)}%)`;
-                obj.attackType = "makuri";
-              } else if (obj.effMsRate >= obj.effSashiRate) {
-                obj.roleText = `⚡${c}C捲り差(${obj.effMsRate.toFixed(1)}%)`;
-                obj.attackType = "makurisashi";
-              } else {
-                obj.roleText = `📐${c}C差し(${obj.effSashiRate.toFixed(1)}%)`;
-                obj.attackType = "sashi";
-              }
-            } else if (c === 5) {
-              if (obj.effMsRate >= 9.0) {
-                obj.roleText = `⚡5Cまくり差(${obj.effMsRate.toFixed(1)}%)`;
-                obj.attackType = "makurisashi";
-              } else {
-                obj.roleText = `⏳5C展開待(${obj.effWaitRate.toFixed(0)}%)`;
-                obj.attackType = "tenkaimachi";
-              }
-            } else if (c === 6) {
-              obj.roleText = `⏳6C展開待(${obj.effWaitRate.toFixed(0)}%)`;
-              obj.attackType = "tenkaimachi";
+          const chosenTac = obj.b.manualTactic !== "auto" ? obj.b.manualTactic : (primaryScenario.plan[c] || "sashi");
+          obj.attackType = chosenTac;
+          if (chosenTac === "makuri") hasActiveMakuri = true;
+        }
+
+        for (let c = 1; c <= 6; c++) {
+          const obj = courseEval[c];
+          const isManual = obj.b.manualTactic !== "auto";
+          const tac = obj.attackType;
+          const prefix = isManual ? "🎯指定:" : "";
+
+          if (tac === "nige") {
+            obj.firstScore += (isManual ? 32 : 12) * cw.ws;
+            obj.placeScore += 12 * cw.ws;
+            obj.roleText = `${prefix}🛡️イン先マイ(${obj.effMakuriRate.toFixed(0)}%)`;
+            if (isManual) manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【逃げ(先マイ)】を指定`);
+          } else if (tac === "sashi") {
+            obj.firstScore += (isManual ? 22 : 8 + vSashiMod * 0.5) * cw.ws;
+            obj.placeScore += (isManual ? 28 : 16) * cw.ws;
+            const sLabel = c === 4 ? "二番差し" : `${c}C差し`;
+            obj.roleText = `${prefix}📐${sLabel}(${obj.effSashiRate.toFixed(1)}%)`;
+            if (isManual) manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【1M差し】を指定 → ターンマーク際を鋭く差し抜け`);
+            if (courseEval[1] && c >= 2) courseEval[1].placeScore += 10 * cw.ws;
+          } else if (tac === "makuri") {
+            obj.firstScore += (isManual ? 36 : 20 + vMakuriMod) * cw.ws;
+            obj.placeScore += 15 * cw.ws;
+            obj.roleText = `${prefix}🔥${c}Cまくり(${obj.effMakuriRate.toFixed(1)}%)`;
+            if (isManual) manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【まくり】を指定 → 内枠被弾＆外連動`);
+            for (let inner = 1; inner < c; inner++) {
+              courseEval[inner].firstScore -= (inner === c - 1 ? 18 : 12) * cw.ws;
+              courseEval[inner].placeScore -= (inner === c - 1 ? 12 : 8) * cw.ws;
             }
+          } else if (tac === "makurisashi") {
+            obj.firstScore += (isManual ? 28 : 14 + vSashiMod * 0.5) * cw.ws;
+            obj.placeScore += (isManual ? 26 : 20) * cw.ws;
+            obj.roleText = `${prefix}⚡${c}Cまくり差(${obj.effMsRate.toFixed(1)}%)`;
+            if (isManual) manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【まくり差し】を指定`);
+            if (courseEval[1] && c >= 3) courseEval[1].placeScore += 8;
+          } else if (tac === "tenkaimachi") {
+            const clashBoost = hasActiveMakuri ? 14 : 6;
+            obj.firstScore += (isManual ? 14 : 6 + clashBoost * 0.5) * cw.ws;
+            obj.placeScore += (isManual ? 30 : 18 + clashBoost) * cw.ws;
+            obj.roleText = `${prefix}⏳${c}C展開待(${obj.effWaitRate.toFixed(0)}%)`;
+            if (isManual) manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【展開待ち(最内・連動差し)】を指定`);
+          } else if (tac === "sotomai") {
+            obj.firstScore += 6 * cw.ws;
+            obj.placeScore += 22 * cw.ws;
+            obj.roleText = `${prefix}🌀${c}C外マイ追走`;
+            if (isManual) manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【外マイ追走】を指定`);
+          } else if (tac === "hekomi") {
+            obj.firstScore -= 24 * cw.ws;
+            obj.placeScore -= 16 * cw.ws;
+            obj.roleText = `${prefix}⚠️被弾・壁崩壊`;
+            if (isManual) manualNotes.push(`${c}コース(${obj.boatId}号艇・${obj.b.name})の【壁崩壊・被弾】を指定`);
           }
         }
 
@@ -5707,7 +5703,7 @@ const UIManager = {
         if (!grid) return;
         grid.innerHTML = "";
 
-        const courses = getCourseLayout(); // Array of boatIds for courses 1 to 6
+        const courses = getCourseLayout();
         for (let c = 1; c <= 6; c++) {
           const bId = courses[c - 1] || c;
           const bData = boatsData[bId] || {};
@@ -5716,6 +5712,12 @@ const UIManager = {
           const bColor = BOAT_COLORS[bId] || BOAT_COLORS[1];
           const cleanName = (bData.name || `${bId}号艇`).split(" ")[0];
 
+          const pastTendency = c === 1
+            ? `逃${(bData.courseWin || 70).toFixed(0)}% / ST.${Math.round((bData.seriesSt || 0.13) * 100).toString().padStart(2, "0")}`
+            : c === 2
+              ? `差${(bData.sashiRate || 16).toFixed(0)}%・逃がし${(bData.nigashi || 55).toFixed(0)}%`
+              : `捲${(bData.makuriRate || 10).toFixed(0)}% / 捲差${(bData.makurisashiRate || 10).toFixed(0)}% / 差${(bData.sashiRate || 5).toFixed(0)}%`;
+
           grid.innerHTML += `
             <div class="bg-slate-950 border ${isManual ? "border-pink-500 shadow-md shadow-pink-500/20" : "border-slate-800"} rounded-lg p-2 text-center space-y-1">
               <div class="flex items-center justify-center gap-1">
@@ -5723,8 +5725,9 @@ const UIManager = {
                 <span class="w-4 h-4 rounded text-[10px] font-black flex items-center justify-center" style="background:${bColor.body};color:${bColor.text};border:1px solid ${bColor.border}">${bId}</span>
               </div>
               <div class="text-[11px] font-bold text-white truncate">${cleanName}</div>
+              <div class="text-[9px] font-mono text-emerald-300 bg-emerald-950/50 rounded px-1 py-0.5 truncate" title="過去レース傾向">${pastTendency}</div>
               <select onchange="updateCourseManualTactic(${c}, this.value)" class="w-full text-[10px] font-bold py-1 px-1 rounded ${isManual ? "bg-pink-950 text-pink-200 border-pink-500" : "bg-slate-900 text-slate-300 border-slate-700"}">
-                <option value="auto" ${curTactic === "auto" ? "selected" : ""}>🤖 AI自動判定</option>
+                <option value="auto" ${curTactic === "auto" ? "selected" : ""}>🤖 過去分析AI自動</option>
                 <option value="nige" ${curTactic === "nige" ? "selected" : ""}>🛡️ 逃げ(先マイ)</option>
                 <option value="sashi" ${curTactic === "sashi" ? "selected" : ""}>📐 差し(1M差し)</option>
                 <option value="makuri" ${curTactic === "makuri" ? "selected" : ""}>🔥 まくり(強襲)</option>
@@ -5733,7 +5736,7 @@ const UIManager = {
                 <option value="sotomai" ${curTactic === "sotomai" ? "selected" : ""}>🌀 外マイ(追走)</option>
                 <option value="hekomi" ${curTactic === "hekomi" ? "selected" : ""}>⚠️ 凹み・壁崩壊</option>
               </select>
-              ${isManual ? '<div class="text-[9px] text-pink-400 font-bold">🎯 手動指定中</div>' : '<div class="text-[9px] text-slate-500">AIおまかせ</div>'}
+              ${isManual ? '<div class="text-[9px] text-pink-400 font-bold">🎯 手動指定中</div>' : '<div class="text-[9px] text-sky-400">📊 過去傾向連動</div>'}
             </div>
           `;
         }
@@ -5745,6 +5748,30 @@ const UIManager = {
         if (boatsData[bId]) {
           boatsData[bId].manualTactic = tacticVal;
         }
+
+        const autoCouple = document.getElementById("chkAutoCoupleTactics")?.checked ?? true;
+        if (autoCouple && tacticVal !== "auto") {
+          const setCourseTac = (courseNum, tac) => {
+            const id = courses[courseNum - 1] || courseNum;
+            if (boatsData[id]) boatsData[id].manualTactic = tac;
+          };
+          if (c === 1 && tacticVal === "nige") {
+            setCourseTac(2, "sashi"); setCourseTac(3, "sotomai"); setCourseTac(4, "sashi"); setCourseTac(5, "makurisashi"); setCourseTac(6, "tenkaimachi");
+          } else if (c === 2 && tacticVal === "sashi") {
+            setCourseTac(1, "nige"); setCourseTac(3, "sotomai"); setCourseTac(4, "sashi"); setCourseTac(5, "makurisashi"); setCourseTac(6, "tenkaimachi");
+          } else if (c === 2 && tacticVal === "makuri") {
+            setCourseTac(1, "hekomi"); setCourseTac(3, "sashi"); setCourseTac(4, "makurisashi"); setCourseTac(5, "tenkaimachi"); setCourseTac(6, "tenkaimachi");
+          } else if (c === 3 && tacticVal === "makuri") {
+            setCourseTac(1, "hekomi"); setCourseTac(2, "hekomi"); setCourseTac(4, "sashi"); setCourseTac(5, "makurisashi"); setCourseTac(6, "tenkaimachi");
+          } else if (c === 3 && tacticVal === "makurisashi") {
+            setCourseTac(1, "nige"); setCourseTac(2, "sashi"); setCourseTac(4, "sashi"); setCourseTac(5, "makurisashi"); setCourseTac(6, "tenkaimachi");
+          } else if (c === 4 && tacticVal === "makuri") {
+            setCourseTac(1, "hekomi"); setCourseTac(2, "hekomi"); setCourseTac(3, "hekomi"); setCourseTac(5, "makurisashi"); setCourseTac(6, "tenkaimachi");
+          } else if (c === 4 && tacticVal === "makurisashi") {
+            setCourseTac(1, "nige"); setCourseTac(2, "sashi"); setCourseTac(3, "sotomai"); setCourseTac(5, "makurisashi"); setCourseTac(6, "tenkaimachi");
+          }
+        }
+
         renderCourseTacticsGrid();
         renderBoatCards();
         runSimulation();
@@ -5753,13 +5780,14 @@ const UIManager = {
       function setTacticsPreset(type) {
         const courses = getCourseLayout();
         const presets = {
-          in_nige: { 1: "nige", 2: "sashi", 3: "auto", 4: "auto", 5: "auto", 6: "auto" },
-          c2_sashi: { 1: "nige", 2: "sashi", 3: "auto", 4: "auto", 5: "auto", 6: "auto" },
-          c2_makuri: { 1: "auto", 2: "makuri", 3: "sashi", 4: "auto", 5: "tenkaimachi", 6: "tenkaimachi" },
-          c3_attack: { 1: "nige", 2: "auto", 3: "makurisashi", 4: "auto", 5: "auto", 6: "auto" },
-          c4_makuri: { 1: "auto", 2: "auto", 3: "hekomi", 4: "makuri", 5: "makurisashi", 6: "tenkaimachi" },
-          out_wait: { 1: "nige", 2: "auto", 3: "makuri", 4: "makuri", 5: "tenkaimachi", 6: "tenkaimachi" },
-          reset: { 1: "auto", 2: "auto", 3: "auto", 4: "auto", 5: "auto", 6: "auto" }
+          in_nige:   { 1: "nige",   2: "sashi",  3: "sotomai",     4: "sashi",       5: "makurisashi", 6: "tenkaimachi" },
+          c2_sashi:  { 1: "nige",   2: "sashi",  3: "sotomai",     4: "sashi",       5: "tenkaimachi", 6: "tenkaimachi" },
+          c2_makuri: { 1: "hekomi", 2: "makuri", 3: "sashi",       4: "makurisashi", 5: "tenkaimachi", 6: "tenkaimachi" },
+          c3_attack: { 1: "nige",   2: "sashi",  3: "makurisashi", 4: "sashi",       5: "makurisashi", 6: "tenkaimachi" },
+          c3_makuri: { 1: "hekomi", 2: "hekomi", 3: "makuri",      4: "sashi",       5: "makurisashi", 6: "tenkaimachi" },
+          c4_makuri: { 1: "hekomi", 2: "hekomi", 3: "hekomi",      4: "makuri",      5: "makurisashi", 6: "tenkaimachi" },
+          out_wait:  { 1: "nige",   2: "hekomi", 3: "makuri",      4: "sashi",       5: "tenkaimachi", 6: "tenkaimachi" },
+          reset:     { 1: "auto",   2: "auto",   3: "auto",        4: "auto",        5: "auto",        6: "auto" }
         };
 
         const target = presets[type] || presets.reset;
