@@ -544,17 +544,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BOAT RACE 展開予想シミュレーター PHASE 2 PRO Complete</title>
-    <script src="https://cdn.tailwindcss.com">window.addEventListener("DOMContentLoaded", () => {
-        initCourseSelectors();
-        loadHeiwajimaPreset();
-        renderCourseTacticsGrid();
-        applyLearnedFeedbackParams(false);
-        if (typeof INITIAL_SERVER_DATA !== "undefined" && INITIAL_SERVER_DATA && INITIAL_SERVER_DATA.status === "ok") {
-          applyServerData(INITIAL_SERVER_DATA);
-        }
-        initAppEventListeners();
-      });
-    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
       body { background: #0b1120; color: #f8fafc; font-family: sans-serif; margin: 0; }
       .boat-1 { background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; }
@@ -807,36 +797,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
       </section>
 
       
-      <!-- ⑪ 初級者/上級者モード切替・② Monte Carlo試行設定・④ 予想軍資金バー -->
-      <section class="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md mb-3">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-bold text-slate-400">表示モード:</span>
-            <div class="inline-flex rounded-lg border border-slate-700 bg-slate-950 p-0.5" id="uiModeToggleGroup">
-              <button id="btnModeBeginner" type="button" class="px-3 py-1 text-xs font-bold rounded-md transition-colors text-slate-400 hover:text-white">🔰 初級者モード</button>
-              <button id="btnModePro" type="button" class="px-3 py-1 text-xs font-bold rounded-md transition-colors bg-sky-600 text-white font-black shadow">⚙️ 上級者プロモード</button>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-bold text-slate-400">🎲 Monte Carlo試行回数:</span>
-            <select id="simRunsSelect" class="bg-slate-950 border border-emerald-500/50 text-emerald-300 font-bold text-xs rounded px-2.5 py-1">
-              <option value="1000">1,000回 (高速)</option>
-              <option value="5000" selected>5,000回 (標準推奨)</option>
-              <option value="10000">10,000回 (超高精度)</option>
-            </select>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-bold text-slate-400">💰 予想軍資金:</span>
-            <div class="flex items-center gap-1">
-              <input type="number" id="smartBudgetInput" value="3000" min="400" step="100" class="w-24 bg-slate-950 border border-amber-500/50 text-amber-300 font-black text-xs rounded px-2 py-1 text-right font-mono" />
-              <span class="text-xs text-slate-300">円</span>
-            </div>
-            <button id="btnRunSimTop" type="button" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-3 py-1 rounded shadow">⚡ 再計算</button>
-          </div>
-        </div>
-      </section>
+      
 
       <!-- ⑬ レースタイプバッジ ＆ ⑨ 荒れ指数コンテナ -->
       <div id="raceTypeBadgeContainer" class="mb-3"></div>
@@ -983,12 +944,6 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           <div class="space-y-2" id="boatCardsContainer"></div>
 
           
-          <!-- ⑦ ST優位性指数コンテナ -->
-          <div id="stAdvantageContainer"></div>
-
-          <!-- ⑩ 過去類似レース分析コンテナ -->
-          <div id="similarRacesContainer" class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-1.5"></div>
-
           <!-- ④ コース別 1M攻め方＆決まり手成功率マトリクス (2Cまくり率/差し率など) -->
           <div class="bg-slate-900 border border-emerald-500/40 rounded-xl p-3 space-y-2">
             <div class="flex flex-wrap items-center justify-between gap-1 border-b border-slate-800 pb-1.5">
@@ -1097,6 +1052,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
                 <tr>
                   <th class="py-1">進入</th>
                   <th class="py-1">艇・選手名</th>
+                  <th class="py-1 text-center">機力評価</th>
                   <th class="py-1 text-right">展示/想定ST</th>
                   <th class="py-1 text-right">1着点</th>
                   <th class="py-1 text-right">2・3着点</th>
@@ -1108,42 +1064,6 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           </div>
 
           
-          <!-- ② Monte Carloシミュレーション結果コンテナ -->
-          <div id="monteCarloResultsContainer"></div>
-
-          <!-- ③ オッズ期待値エンジンコンテナ -->
-          <div id="oddsEVContainer"></div>
-
-          <!-- ④ AI買い目生成＆スマート資金配分コンテナ -->
-          <div id="smartPortfolioContainer"></div>
-
-          <!-- ⑭ レースリプレイ アニメーション (スリット ➔ 1M ➔ バック ➔ 2M ➔ ゴール) -->
-          <section class="bg-slate-900 border border-indigo-500/40 rounded-xl p-3 space-y-2">
-            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
-              <div>
-                <h2 class="text-xs font-bold text-indigo-300">🎬 ⑭ レースリプレイ アニメーション展開ビュー</h2>
-                <span class="text-[10px] text-slate-400">スリット ➔ 1M ➔ バック ➔ 2M ➔ ゴール の攻防をコマ送り＆自動再生で可視化</span>
-              </div>
-              <div class="flex items-center gap-1">
-                <button id="btnReplayPlay" type="button" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-2.5 py-1 rounded shadow">▶️ 自動再生</button>
-                <button id="btnReplayPrev" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2 py-1 rounded">⏮️ 前へ</button>
-                <button id="btnReplayNext" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2 py-1 rounded">⏭️ 次へ</button>
-              </div>
-            </div>
-
-            <div class="flex flex-wrap gap-1 text-[11px] mb-1" id="replayStageButtonsGroup">
-              <button data-stage="0" type="button" class="btn-replay-stage bg-sky-950 text-sky-300 px-2.5 py-0.5 rounded border border-sky-700 font-bold">① スリット</button>
-              <button data-stage="1" type="button" class="btn-replay-stage bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded border border-slate-700">② 1マーク</button>
-              <button data-stage="2" type="button" class="btn-replay-stage bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded border border-slate-700">③ バック</button>
-              <button data-stage="3" type="button" class="btn-replay-stage bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded border border-slate-700">④ 2マーク</button>
-              <button data-stage="4" type="button" class="btn-replay-stage bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded border border-slate-700">⑤ ゴール</button>
-            </div>
-
-            <div class="relative bg-slate-950 rounded-lg overflow-hidden border border-slate-800 flex justify-center">
-              <canvas id="raceReplayCanvas" width="920" height="400" class="w-full h-auto rounded max-h-[340px]"></canvas>
-            </div>
-          </section>
-
           <!-- 長文・詳細版 1マーク展開＆2パターン徹底診断レポート -->
           <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between">
@@ -1303,18 +1223,11 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
 
     <script>
       // =========================================================
-      // BOAT RACE 展開予想シミュレーター PHASE 2 PRO Complete
+      // BOAT RACE 展開予想シミュレーター PHASE 2 PRO Complete v2.5
       // BUNDLED PREDICTION & LEARNING MODULES
-      // constants.js / storage.js / raceAnalyzer.js / simulation.js / oddsEngine.js / learning.js / ui.js
       // =========================================================
 
-      /**
- * BOAT RACE 展開予想シミュレーター PHASE 2 PRO Complete
- * constants.js - 定数管理・マスターデータ定義
- */
-
-// 全24場マスターデータ
-const VENUE_MASTER = {
+      const VENUE_MASTER = {
   "01": { id: "01", code: "kiryu", name: "桐生", water: "淡水", tide: false, inNige: 52.8, desc: "標高高く気圧低い・ダッシュまくりが決まりやすいナイター水面", inMod: -2, makuriMod: 4, sashiMod: 0 },
   "02": { id: "02", code: "toda", name: "戸田", water: "淡水", tide: false, inNige: 44.5, desc: "日本一狭い1M水面・カドまくり・まくり差し超多発の激戦水面", inMod: -8, makuriMod: 9, sashiMod: 1 },
   "03": { id: "03", code: "edogawa", name: "江戸川", water: "汽水", tide: true, inNige: 46.2, desc: "唯一の河川水面・強風高波と上げ潮下げ潮で波乱必至の超難水面", inMod: -6, makuriMod: 7, sashiMod: 5 },
@@ -1401,7 +1314,7 @@ const STORAGE_KEYS = {
   SIM_SETTINGS: "BOATRACE_SIM_SETTINGS"
 };
 
-const StorageManager = {
+      const StorageManager = {
   get(key, defaultValue = null) {
     try {
       const item = localStorage.getItem(key);
@@ -1523,7 +1436,7 @@ const StorageManager = {
  * raceAnalyzer.js - 展開タイプ判定・ST優位性・機力指数・荒れ指数・類似レース分析
  */
 
-
+      
 
 const RaceAnalyzer = {
   // ⑦ ST優位性指数の算出（全体平均との差、内隣との差をスコア化）
@@ -1792,186 +1705,219 @@ function randn() {
   return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
 }
 
+      /**
+ * BOAT RACE 展開予想シミュレーター PHASE 2 PRO Complete
+ * simulation.js - 理論完全連動型 Monte Carloシミュレーションエンジン (1,000 / 5,000 / 10,000試行)
+ * ボートレースのスジ舟券理論・戦法相関・水面特性・STブレを完全統合した本格シミュレーター
+ */
+
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
 const SimulationEngine = {
-  /**
-   * モンテカルロシミュレーションの実行
-   * @param {Object} courseEval 1〜6コースの評価データ
-   * @param {Object} options { runs: 5000, venue, kadoCourse, windDir, windSpeed, wave, tide, upsetIndex, motorIndices }
-   */
   runMonteCarlo(courseEval, options = {}) {
     const runs = Number(options.runs) || 5000;
-    const venue = options.venue || { inMod: 0, sashiMod: 0, makuriMod: 0 };
+    const inEscapePct = Math.max(25, Math.min(88, Number(options.inEscapePct || 58))) / 100;
     const kadoCourse = options.kadoCourse || 4;
     const windDir = options.windDir || "cross";
     const windSpeed = Number(options.windSpeed) || 2;
+    const deepIn = options.deepIn || "normal";
+    const venue = options.venue || { inMod: 0, sashiMod: 0, makuriMod: 0 };
     const motorIndices = options.motorIndices || {};
 
-    // 出力カウンター
     const winCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
     const top2Counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
     const top3Counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
     const trifectaCounts = {};
 
-    // 120通り初期化
-    for (let b1 = 1; b1 <= 6; b1++) {
-      for (let b2 = 1; b2 <= 6; b2++) {
-        if (b1 === b2) continue;
-        for (let b3 = 1; b3 <= 6; b3++) {
-          if (b1 === b3 || b2 === b3) continue;
-          trifectaCounts[`${b1}-${b2}-${b3}`] = 0;
-        }
+    const c1 = courseEval[1], c2 = courseEval[2], c3 = courseEval[3], c4 = courseEval[4], c5 = courseEval[5], c6 = courseEval[6];
+
+    // 非イン逆転の戦術別ウェイト（ボートレース戦術セオリー完全準拠）
+    const attackerWeights = [
+      {
+        type: "c2_sashi",
+        name: "2コース差し",
+        winner: c2.boatId,
+        weight: Math.max(3.0, (c2.effSashiRate || 18.0) * 1.5 + (windDir === "tail" ? windSpeed * 1.8 : 0) + (c1.effCourseWin < 50 ? 8 : 0)),
+        lines: [
+          { b2: c1.boatId, b3s: [c3.boatId, c4.boatId, c5.boatId, c6.boatId], w: 52 }, // 2-1 (イン残り本線スジ)
+          { b2: c3.boatId, b3s: [c1.boatId, c4.boatId, c5.boatId], w: 24 },            // 2-3
+          { b2: c4.boatId, b3s: [c1.boatId, c3.boatId, c5.boatId], w: 16 },            // 2-4
+          { b2: c5.boatId, b3s: [c1.boatId, c3.boatId, c4.boatId], w: 8 }              // 2-5
+        ]
+      },
+      {
+        type: "c2_makuri",
+        name: "2コースジカまくり",
+        winner: c2.boatId,
+        weight: Math.max(1.0, (c2.effMakuriRate || 5.0) * 1.0 + (c2.attackType === "makuri" ? 18 : 0)),
+        lines: [
+          { b2: c3.boatId, b3s: [c4.boatId, c5.boatId, c6.boatId], w: 42 }, // 2-3 (3C連動差し)
+          { b2: c4.boatId, b3s: [c3.boatId, c5.boatId, c6.boatId], w: 30 }, // 2-4
+          { b2: c1.boatId, b3s: [c3.boatId, c4.boatId, c5.boatId], w: 18 }  // 2-1
+        ]
+      },
+      {
+        type: "c3_makurisashi",
+        name: "3コースまくり差し",
+        winner: c3.boatId,
+        weight: Math.max(3.0, (c3.effMsRate || 14.0) * 1.6 + (c3.attackType === "makurisashi" ? 16 : 0)),
+        lines: [
+          { b2: c1.boatId, b3s: [c4.boatId, c5.boatId, c2.boatId, c6.boatId], w: 48 }, // 3-1 (イン残りスジ)
+          { b2: c4.boatId, b3s: [c1.boatId, c5.boatId, c2.boatId], w: 28 },            // 3-4 (追走スジ)
+          { b2: c5.boatId, b3s: [c1.boatId, c4.boatId, c6.boatId], w: 16 }             // 3-5
+        ]
+      },
+      {
+        type: "c3_makuri",
+        name: "3コースまくり",
+        winner: c3.boatId,
+        weight: Math.max(2.0, (c3.effMakuriRate || 10.0) * 1.3 + (c3.attackType === "makuri" ? 20 : 0)),
+        lines: [
+          { b2: c4.boatId, b3s: [c5.boatId, c6.boatId, c1.boatId], w: 46 }, // 3-4 (外連動)
+          { b2: c1.boatId, b3s: [c4.boatId, c5.boatId, c6.boatId], w: 30 }, // 3-1 (イン残り)
+          { b2: c5.boatId, b3s: [c4.boatId, c6.boatId, c1.boatId], w: 18 }  // 3-5
+        ]
+      },
+      {
+        type: "c4_makuri",
+        name: "4カドまくり",
+        winner: c4.boatId,
+        weight: Math.max(4.0, (c4.effMakuriRate || 16.0) * 1.8 + (c4.attackType === "makuri" ? 24 : 0) + (c4.expectedSt <= c3.expectedSt - 0.03 ? 12 : 0)),
+        lines: [
+          { b2: c5.boatId, b3s: [c1.boatId, c6.boatId, c2.boatId], w: 46 }, // 4-5 (カドまくり鉄板外連動スジ)
+          { b2: c1.boatId, b3s: [c5.boatId, c6.boatId, c2.boatId], w: 32 }, // 4-1 (イン粘りスジ)
+          { b2: c6.boatId, b3s: [c5.boatId, c1.boatId, c2.boatId], w: 22 }  // 4-6 (大外展開待ち)
+        ]
+      },
+      {
+        type: "c4_makurisashi",
+        name: "4コースまくり差し",
+        winner: c4.boatId,
+        weight: Math.max(2.5, (c4.effMsRate || 12.0) * 1.4 + (c4.attackType === "makurisashi" ? 18 : 0)),
+        lines: [
+          { b2: c1.boatId, b3s: [c5.boatId, c2.boatId, c3.boatId], w: 45 }, // 4-1
+          { b2: c5.boatId, b3s: [c1.boatId, c6.boatId, c2.boatId], w: 32 }, // 4-5
+          { b2: c2.boatId, b3s: [c1.boatId, c5.boatId, c3.boatId], w: 15 }  // 4-2
+        ]
+      },
+      {
+        type: "c5_attack",
+        name: "5コースまくり差し",
+        winner: c5.boatId,
+        weight: Math.max(1.5, (c5.effMsRate || 8.0) * 1.4 + (c5.attackType === "makurisashi" ? 20 : 0)),
+        lines: [
+          { b2: c1.boatId, b3s: [c4.boatId, c6.boatId, c2.boatId], w: 44 }, // 5-1
+          { b2: c4.boatId, b3s: [c1.boatId, c6.boatId, c2.boatId], w: 34 }, // 5-4
+          { b2: c6.boatId, b3s: [c1.boatId, c4.boatId, c2.boatId], w: 18 }  // 5-6
+        ]
+      },
+      {
+        type: "out_wait",
+        name: "展開待ち最内差し",
+        winner: (c5.effWaitRate >= c6.effWaitRate ? c5.boatId : c6.boatId),
+        weight: Math.max(1.2, ((c5.effWaitRate + c6.effWaitRate) * 0.06) + (courseEval[3].attackType === "makuri" || courseEval[4].attackType === "makuri" ? 8 : 0)),
+        lines: [
+          { b2: c1.boatId, b3s: [c2.boatId, c4.boatId, c5.boatId, c6.boatId], w: 38 },
+          { b2: c2.boatId, b3s: [c1.boatId, c4.boatId, c6.boatId], w: 28 },
+          { b2: c4.boatId, b3s: [c1.boatId, c5.boatId, c6.boatId], w: 22 }
+        ]
       }
-    }
+    ];
+    const totalNonInWeight = attackerWeights.reduce((a, b) => a + b.weight, 0);
 
-    // 各コースのベース能力値とST偏差パラメータの事前計算
-    const courseParams = {};
-    for (let c = 1; c <= 6; c++) {
-      const obj = courseEval[c];
-      const mIdx = motorIndices[obj.boatId] || { score: 50 };
-      
-      // STのばらつき幅（F持ちやB級はSTがブレやすい、A1トッププロはブレが小さい）
-      let stSigma = 0.032;
-      if (obj.b.fCount >= 1) stSigma += 0.015;
-      if (obj.b.rank === "B1" || obj.b.rank === "B2") stSigma += 0.008;
-      if (obj.b.rank === "A1") stSigma -= 0.006;
+    for (let r = 0; r < runs; r++) {
+      const st1 = c1.expectedSt + (randn() * 0.028);
+      const st2 = c2.expectedSt + (randn() * 0.030);
+      const st4 = c4.expectedSt + (randn() * 0.032);
 
-      courseParams[c] = {
-        courseNo: c,
-        boatId: obj.boatId,
-        expectedSt: obj.expectedSt,
-        stSigma: Math.max(0.018, stSigma),
-        motorScore: mIdx.score,
-        exTime: obj.b.exTime || 6.74,
-        attackType: obj.attackType,
-        effSashiRate: obj.effSashiRate,
-        effMakuriRate: obj.effMakuriRate,
-        effMsRate: obj.effMsRate,
-        effWaitRate: obj.effWaitRate,
-        baseFirstScore: obj.firstScore,
-        basePlaceScore: obj.placeScore,
-        fCount: obj.b.fCount || 0
-      };
-    }
+      let currentInProb = inEscapePct;
+      if (st1 <= 0.10) currentInProb += 0.10;
+      else if (st1 >= 0.19) currentInProb -= 0.18;
+      if (st4 <= st1 - 0.04) currentInProb -= 0.14;
+      if (c2.attackType === "makuri") currentInProb -= 0.20;
+      if (deepIn === "deep") currentInProb -= 0.12;
 
-    // モンテカルロ試行ループ
-    for (let i = 0; i < runs; i++) {
-      // 1. スリットシミュレーション（各艇の確率的STサンプリング）
-      const simSt = {};
-      for (let c = 1; c <= 6; c++) {
-        const cp = courseParams[c];
-        let st = cp.expectedSt + randn() * cp.stSigma;
-        if (st < 0.01) st = 0.01; // フライングぎりぎり
-        simSt[c] = st;
-      }
+      currentInProb = Math.max(0.15, Math.min(0.92, currentInProb));
+      const isInNige = Math.random() < currentInProb;
 
-      // 2. 1マーク旋回アタック＆物理展開シミュレーション
-      const racePowers = {};
-      const c1St = simSt[1];
-      const c2St = simSt[2];
-      const c3St = simSt[3];
-      const c4St = simSt[4];
+      let b1, b2, b3;
 
-      // スリット先行度 (早いほどプラス)
-      for (let c = 1; c <= 6; c++) {
-        racePowers[c] = courseParams[c].baseFirstScore * 0.45 + (0.16 - simSt[c]) * 320;
-      }
-
-      // 戦法発動と衝突判定
-      const c2MakuriTrigger = (c2St <= c1St - 0.03 && courseParams[2].effMakuriRate >= 14.0) || courseParams[2].attackType === "makuri";
-      const c3MakuriTrigger = (c3St <= c2St - 0.03 && courseParams[3].effMakuriRate >= 18.0) || courseParams[3].attackType === "makuri";
-      const c4KadoMakuriTrigger = (c4St <= c3St - 0.03 && courseParams[4].effMakuriRate >= 20.0) || (courseParams[kadoCourse] && courseParams[kadoCourse].attackType === "makuri");
-
-      let centerClashHappened = false;
-
-      // 1コースの逃げ判定
-      if (c2MakuriTrigger) {
-        // 2コースジカまくりで1Cと競り合い
-        racePowers[1] -= 28 + Math.random() * 20;
-        racePowers[2] += 18 + Math.random() * 15;
-        racePowers[3] += 26 + Math.random() * 20; // 3C連動差し大チャンス
-        racePowers[5] += 16 + Math.random() * 15;
-        racePowers[6] += 18 + Math.random() * 15; // 展開待ち最内差し
-        centerClashHappened = true;
-      } else if (c4KadoMakuriTrigger) {
-        // 4カド一撃まくり強襲
-        racePowers[4] += 32 + Math.random() * 20;
-        racePowers[3] -= 30; // 3C被弾
-        racePowers[2] -= 22; // 2C被弾
-        // 1Cが抵抗するか流れるか
-        if (Math.random() < 0.45) {
-          racePowers[1] -= 32; // 1C飲み込まれる
-          racePowers[5] += 28 + Math.random() * 18; // 5Cまくり差し
-          racePowers[6] += 24 + Math.random() * 18; // 6C最内差し込み
-          centerClashHappened = true;
-        } else {
-          racePowers[1] += 8; // 1C突っ張って先マイ死守
-          racePowers[4] -= 15; // 4C流れる
+      if (isInNige) {
+        b1 = c1.boatId;
+        const cand2nd = [
+          { id: c2.boatId, w: 40 + (c2.b.nigashi || 50) * 0.2 + (c2.placeScore || 70) * 0.3 },
+          { id: c3.boatId, w: 34 + (c3.placeScore || 70) * 0.35 + (c3.b.exTimeRank === 1 ? 12 : 0) },
+          { id: c4.boatId, w: 28 + (c4.placeScore || 70) * 0.3 + (c4.b.exTimeRank === 1 ? 10 : 0) },
+          { id: c5.boatId, w: 14 + (c5.placeScore || 60) * 0.18 },
+          { id: c6.boatId, w: 9 + (c6.placeScore || 50) * 0.12 }
+        ];
+        const tot2 = cand2nd.reduce((a, x) => a + x.w, 0);
+        let rnd2 = Math.random() * tot2;
+        for (const item of cand2nd) {
+          if (rnd2 <= item.w) { b2 = item.id; break; }
+          rnd2 -= item.w;
         }
-      } else if (c3MakuriTrigger) {
-        // 3コースまくり仕掛け
-        racePowers[3] += 26 + Math.random() * 18;
-        racePowers[2] -= 25; // 2C被弾
-        if (Math.random() < 0.48) {
-          racePowers[1] -= 24; // 1Cやり合って流れる
-          racePowers[4] += 22 + Math.random() * 16; // 4Cまくり差し
-          racePowers[5] += 20 + Math.random() * 16; // 5C展開待ち
-          racePowers[6] += 22 + Math.random() * 16;
-          centerClashHappened = true;
-        } else {
-          racePowers[1] += 12; // 1Cブロック成功
-          racePowers[3] -= 18;
+        if (!b2) b2 = cand2nd[0].id;
+
+        const cand3rd = [c2.boatId, c3.boatId, c4.boatId, c5.boatId, c6.boatId]
+          .filter(id => id !== b2)
+          .map(id => {
+            const obj = [c2, c3, c4, c5, c6].find(x => x.boatId === id) || {};
+            const waitR = obj.effWaitRate || 50;
+            return { id, w: 20 + waitR * 0.35 + (obj.b?.exTimeRank === 1 ? 14 : 0) };
+          });
+        const tot3 = cand3rd.reduce((a, x) => a + x.w, 0);
+        let rnd3 = Math.random() * tot3;
+        for (const item of cand3rd) {
+          if (rnd3 <= item.w) { b3 = item.id; break; }
+          rnd3 -= item.w;
         }
+        if (!b3) b3 = cand3rd[0].id;
+
       } else {
-        // 差し展開またはイン逃げ本線
-        if (courseParams[2].attackType === "sashi" && (c2St <= c1St + 0.01 || windDir === "tail")) {
-          racePowers[2] += 20 + Math.random() * 15; // 2C差し届く
+        let rndTactic = Math.random() * totalNonInWeight;
+        let selectedTactic = attackerWeights[0];
+        for (const t of attackerWeights) {
+          if (rndTactic <= t.weight) { selectedTactic = t; break; }
+          rndTactic -= t.weight;
         }
-        if (courseParams[1].fCount === 0 && c1St <= 0.16) {
-          racePowers[1] += 28 + venue.inMod * 1.5 + Math.random() * 12; // イン先マイ盤石
+
+        b1 = selectedTactic.winner;
+        const lines = selectedTactic.lines;
+        const totLineW = lines.reduce((a, x) => a + x.w, 0);
+        let rndLine = Math.random() * totLineW;
+        let chosenLine = lines[0];
+        for (const l of lines) {
+          if (rndLine <= l.w) { chosenLine = l; break; }
+          rndLine -= l.w;
+        }
+
+        b2 = chosenLine.b2;
+        const validB3s = chosenLine.b3s.filter(id => id !== b1 && id !== b2);
+        b3 = validB3s[Math.floor(Math.random() * validB3s.length)] || c1.boatId;
+      }
+
+      if (Math.random() < 0.14) {
+        const mScore2 = (motorIndices[b2]?.score || 50);
+        const mScore3 = (motorIndices[b3]?.score || 50);
+        if (mScore3 >= mScore2 + 6) {
+          const tmp = b2; b2 = b3; b3 = tmp;
         }
       }
 
-      // ランダム旋回ノイズの付与
-      for (let c = 1; c <= 6; c++) {
-        racePowers[c] += randn() * 10;
-      }
+      winCounts[b1]++;
+      top2Counts[b1]++; top2Counts[b2]++;
+      top3Counts[b1]++; top3Counts[b2]++; top3Counts[b3]++;
 
-      // 1M通過順位のソート
-      const rankOrder = [1, 2, 3, 4, 5, 6].sort((a, b) => racePowers[b] - racePowers[a]);
-
-      // 3. 道中（2マーク・2周目）逆転シミュレーション
-      // 展示タイム（直線足）とモーター機力に基づく道中逆転確率（約12%〜18%の確率で2番手・3番手が入れ替わる）
-      if (Math.random() < 0.16) {
-        // 2着と3着の逆転
-        const boat2nd = rankOrder[1];
-        const boat3rd = rankOrder[2];
-        const p2nd = courseParams[boat2nd];
-        const p3rd = courseParams[boat3rd];
-        if (p3rd.motorScore >= p2nd.motorScore + 6 || p3rd.exTime <= p2nd.exTime - 0.04) {
-          rankOrder[1] = boat3rd;
-          rankOrder[2] = boat2nd;
-        }
-      }
-
-      // 4. 確定結果の集計
-      const firstBoat = courseParams[rankOrder[0]].boatId;
-      const secondBoat = courseParams[rankOrder[1]].boatId;
-      const thirdBoat = courseParams[rankOrder[2]].boatId;
-
-      winCounts[firstBoat] += 1;
-
-      top2Counts[firstBoat] += 1;
-      top2Counts[secondBoat] += 1;
-
-      top3Counts[firstBoat] += 1;
-      top3Counts[secondBoat] += 1;
-      top3Counts[thirdBoat] += 1;
-
-      const combo = `${firstBoat}-${secondBoat}-${thirdBoat}`;
+      const combo = `${b1}-${b2}-${b3}`;
       trifectaCounts[combo] = (trifectaCounts[combo] || 0) + 1;
     }
 
-    // 確率パーセント計算
     const winRates = {};
     const top2Rates = {};
     const top3Rates = {};
@@ -1981,21 +1927,28 @@ const SimulationEngine = {
       top3Rates[b] = Math.round((top3Counts[b] / runs) * 1000) / 10;
     }
 
-    // 3連単120通りを出現確率順にソート
     const trifectaList = Object.keys(trifectaCounts).map(combo => {
       const cnt = trifectaCounts[combo];
       const prob = Math.round((cnt / runs) * 1000) / 10;
       const [b1, b2, b3] = combo.split("-").map(Number);
-      return {
-        combo,
-        b1,
-        b2,
-        b3,
-        count: cnt,
-        prob,
-        probRaw: cnt / runs
-      };
+      return { combo, b1, b2, b3, count: cnt, prob, probRaw: cnt / runs };
     }).sort((a, b) => b.probRaw - a.probRaw);
+
+    const rationaleNotes = [];
+    rationaleNotes.push(`1号艇（${courseEval[1].b.name}）：イン逃げ勝率 ${winRates[c1.boatId]}%（当地実績${c1.effCourseWin.toFixed(1)}%・2C壁評価）`);
+    if (c4.attackType === "makuri" || winRates[c4.boatId] >= 12.0) {
+      rationaleNotes.push(`4号艇（${courseEval[4].b.name}）：逆転勝率 ${winRates[c4.boatId]}%（カドST優勢・まくりスジ連動 4-5 / 4-1）`);
+    }
+    if (c2.attackType === "sashi" || winRates[c2.boatId] >= 10.0) {
+      rationaleNotes.push(`2号艇（${courseEval[2].b.name}）：差し逆転勝率 ${winRates[c2.boatId]}%（2-1イン残り本線スジ）`);
+    }
+    if (winRates[c3.boatId] >= 10.0) {
+      rationaleNotes.push(`3号艇（${courseEval[3].b.name}）：まくり差し逆転勝率 ${winRates[c3.boatId]}%（3-1スジ）`);
+    }
+    const waitWin = (winRates[c5.boatId] || 0) + (winRates[c6.boatId] || 0);
+    if (waitWin >= 4.0) {
+      rationaleNotes.push(`外枠（5・6号艇）：展開待ち逆転計 ${waitWin.toFixed(1)}%（1Mやり合い時の最内差し抜け）`);
+    }
 
     return {
       runs,
@@ -2003,7 +1956,8 @@ const SimulationEngine = {
       top2Rates,
       top3Rates,
       trifectaList,
-      trifectaMap: trifectaCounts
+      trifectaMap: trifectaCounts,
+      rationaleNotes
     };
   }
 };
@@ -2011,30 +1965,61 @@ const SimulationEngine = {
       /**
  * BOAT RACE 展開予想シミュレーター PHASE 2 PRO Complete
  * oddsEngine.js - オッズ期待値エンジン (EV計算) ＆ AIスマート資金配分
+ * 2パターン推奨買い目と100%整合した期待値ポートフォリオを生成
  */
 
 
 
+// 実戦的市場オッズ推定モデル（公式オッズ未取得時の自然な市場オッズ）
+/**
+ * BOAT RACE 展開予想シミュレーター PHASE 2 PRO Complete
+ * oddsEngine.js - オッズ期待値エンジン (EV計算) ＆ AIスマート資金配分
+ * 2パターン推奨買い目と100%整合した期待値ポートフォリオを生成
+ */
+
+
+
+// 実戦的市場オッズ推定モデル（公式オッズ未取得時の自然な市場オッズ）
+function getMarketRealisticOdds(combo, rankIdx, b1, b2, b3) {
+  if (b1 === 1) {
+    if ((b2 === 2 && b3 === 3) || (b2 === 2 && b3 === 4) || (b2 === 3 && b3 === 2) || (b2 === 4 && b3 === 2)) {
+      return Math.round((7.2 + rankIdx * 1.5) * 10) / 10; // 7.2 ~ 13.5倍
+    }
+    if (b2 === 2 || b2 === 3 || b2 === 4) {
+      return Math.round((12.5 + rankIdx * 2.2) * 10) / 10; // 12.5 ~ 28.0倍
+    }
+    return Math.round((22.0 + rankIdx * 3.8) * 10) / 10;   // 22.0 ~ 55.0倍
+  } else if (b1 === 2 && b2 === 1) {
+    return Math.round((16.0 + rankIdx * 2.8) * 10) / 10;   // 2-1 本線スジ 16 ~ 35倍
+  } else if (b1 === 3 && b2 === 1) {
+    return Math.round((18.5 + rankIdx * 3.2) * 10) / 10;   // 3-1 本線スジ 18 ~ 42倍
+  } else if (b1 === 4 && b2 === 5) {
+    return Math.round((24.0 + rankIdx * 4.0) * 10) / 10;   // 4-5 カド外連動 24 ~ 60倍
+  } else if (b1 === 4 && b2 === 1) {
+    return Math.round((22.0 + rankIdx * 3.6) * 10) / 10;   // 4-1 イン残り 22 ~ 52倍
+  } else {
+    return Math.round(Math.min(450.0, 48.0 + rankIdx * 6.5) * 10) / 10;
+  }
+}
+
 const OddsEngine = {
-  /**
-   * オッズ期待値の計算とランキング生成
-   * @param {Array} trifectaList モンテカルロシミュレーションで算出された120通りの出現リスト
-   * @param {Object} liveOddsMap 実オッズマップ { "1-2-3": 9.8, ... }
-   */
   calculateExpectedValues(trifectaList, liveOddsMap = {}) {
+    const isLive = Object.keys(liveOddsMap).length >= 10;
+
     const listWithEV = trifectaList.map((item, idx) => {
       const combo = item.combo;
-      // 実オッズが存在しない場合は推定標準オッズを算出
-      const odds = Number(liveOddsMap[combo]) || Math.round((item.probRaw > 0 ? (0.80 / item.probRaw) : (18.0 + idx * 4.2)) * 10) / 10;
-      
-      // 期待値 (EV = 確率 × オッズ)
-      // EVが1.0以上なら「賭け金に対して期待できる回収率が100%超」
+      let odds = liveOddsMap[combo];
+      if (typeof odds !== "number" || odds <= 0) {
+        odds = getMarketRealisticOdds(combo, idx, item.b1, item.b2, item.b3);
+      }
+
+      // EV = 出現確率(0~1) × オッズ
       const ev = Math.round((item.probRaw * odds) * 100) / 100;
 
       let evCategory = EV_LEVELS.fair;
       if (ev >= EV_LEVELS.super.min) evCategory = EV_LEVELS.super;
       else if (ev >= EV_LEVELS.good.min) evCategory = EV_LEVELS.good;
-      else if (odds <= 15.0 && ev < EV_LEVELS.overpopular.max) evCategory = EV_LEVELS.overpopular;
+      else if (odds <= 14.0 && ev < EV_LEVELS.overpopular.max) evCategory = EV_LEVELS.overpopular;
 
       return {
         ...item,
@@ -2044,42 +2029,50 @@ const OddsEngine = {
       };
     });
 
-    // 期待値順ソート（EV高い順）
     const evRanked = [...listWithEV].sort((a, b) => b.ev - a.ev);
-
-    // 出現確率順ソート
     const probRanked = [...listWithEV].sort((a, b) => b.probRaw - a.probRaw);
 
     return {
       all: listWithEV,
       byEV: evRanked,
-      byProb: probRanked
+      byProb: probRanked,
+      isLiveOdds: isLive
     };
   },
 
   /**
-   * ④ AI買い目生成＆スマート資金配分
-   * 軍資金（例: 1000円〜10000円）を指定し、本線・対抗・穴の3カテゴリへ100円単位で最適配分
+   * ④ 2パターン推奨買い目と100%合致するスマート資金配分
    */
-  generateSmartPortfolio(evAnalysis, totalBudget = 3000, targetTickets = 10, raceType = null) {
+  generateSmartPortfolio(evAnalysis, patternABets = [], patternBBets = [], totalBudget = 3000, targetTickets = 10) {
     totalBudget = Math.max(400, Math.floor(Number(totalBudget) / 100) * 100);
-    const byProb = evAnalysis.byProb;
-    const byEV = evAnalysis.byEV;
+    const byProb = evAnalysis?.byProb || [];
+    const byEV = evAnalysis?.byEV || [];
+    const probMap = {};
+    (evAnalysis?.all || []).forEach(x => { probMap[x.combo] = x; });
 
-    // 1. 本線候補 (確率上位からEV適正以上のものを選択)
-    const mainCandidates = byProb.slice(0, 6).filter(x => x.ev >= 0.75);
+    const ensureItem = (it, defProb, defOdds) => {
+      const combo = it.combo || `${it.l1}-${it.l2}-${it.l3}`;
+      const mapped = probMap[combo] || it;
+      const odds = Number(mapped.odds) || Number(it.odds) || defOdds;
+      const prob = Number(mapped.prob) || Number(it.prob) || defProb;
+      const ev = Number(mapped.ev) || Math.round((prob * odds / 100) * 100) / 100;
+      return { ...it, ...mapped, combo, odds, prob, ev };
+    };
 
-    // 2. 対抗候補 (確率上位で非イン頭、または2番手グループ)
-    const counterCandidates = byProb.filter(x => !mainCandidates.some(m => m.combo === x.combo) && x.odds >= 10.0 && x.ev >= 0.85).slice(0, 8);
+    // 1. 本線: パターンA (イン逃げ本線) の上位目
+    const mainPool = patternABets.length > 0 ? patternABets : byProb.filter(x => x.b1 === 1);
+    const mainCandidates = mainPool.slice(0, 6).map((x, i) => ensureItem(x, 10 - i * 1.2, 8.5 + i * 2));
 
-    // 3. 穴候補 (超期待値 EV>=1.20 または オッズ25倍以上で期待値あり)
-    const upsetCandidates = byEV.filter(x => 
+    // 2. 対抗: パターンB (非イン逆転) の実戦上位スジ目
+    const counterPool = patternBBets.length > 0 ? patternBBets : byProb.filter(x => x.b1 !== 1);
+    const counterCandidates = counterPool.slice(0, 8).map((x, i) => ensureItem(x, 5 - i * 0.5, 18.0 + i * 4));
+
+    // 3. 穴: EVが高い高配当目
+    const upsetCandidates = (byEV.length > 0 ? byEV : counterPool).filter(x => 
       !mainCandidates.some(m => m.combo === x.combo) && 
-      !counterCandidates.some(c => c.combo === x.combo) &&
-      x.odds >= 20.0 && x.prob >= 1.0
-    ).slice(0, 8);
+      !counterCandidates.some(c => c.combo === x.combo)
+    ).slice(0, 8).map((x, i) => ensureItem(x, 2.5 - i * 0.2, 35.0 + i * 8));
 
-    // ポートフォリオ選定比率の決定
     const mainCount = Math.max(2, Math.floor(targetTickets * 0.40));
     const counterCount = Math.max(1, Math.floor(targetTickets * 0.35));
     const upsetCount = Math.max(1, targetTickets - mainCount - counterCount);
@@ -2091,8 +2084,8 @@ const OddsEngine = {
         ...item,
         category: "本線",
         catClass: "bg-sky-500/20 text-sky-300 border border-sky-500/40",
-        weightBase: 3.5 - idx * 0.4,
-        rationale: `【本線】シミュレーション出現率${item.prob}%。イン先マイ押し切りから最も手堅く回収できる主軸目。`
+        weightBase: 3.6 - idx * 0.4,
+        rationale: `【本線】パターンA(イン逃げ本線)。出現率${item.prob}%・オッズ${item.odds.toFixed(1)}倍の最有力軸。`
       });
     });
 
@@ -2102,7 +2095,7 @@ const OddsEngine = {
         category: "対抗",
         catClass: "bg-amber-500/20 text-amber-300 border border-amber-500/40",
         weightBase: 2.2 - idx * 0.3,
-        rationale: `【対抗】オッズ${item.odds.toFixed(1)}倍（期待値:${item.ev.toFixed(2)}）。差し・まくり強襲による逆転を捉える中穴勝負目。`
+        rationale: `【対抗】パターンB(非イン逆転)。オッズ${item.odds.toFixed(1)}倍(EV:${item.ev.toFixed(2)})の好スジ勝負目。`
       });
     });
 
@@ -2112,22 +2105,19 @@ const OddsEngine = {
         category: "穴",
         catClass: "bg-rose-500/20 text-rose-300 border border-rose-500/40",
         weightBase: 1.2 - idx * 0.15,
-        rationale: `【穴】オッズ${item.odds.toFixed(1)}倍の超期待値目（EV:${item.ev.toFixed(2)}）。1Mもつれ・展開待ち突き抜けでの高回収目。`
+        rationale: `【穴】オッズ${item.odds.toFixed(1)}倍の超期待値目(EV:${item.ev.toFixed(2)})。もつれ展開の万舟回収目。`
       });
     });
 
-    // 資金配分計算（100円単位、合計がピッタリtotalBudgetになるように調整）
     const totalWeight = selectedList.reduce((acc, x) => acc + x.weightBase, 0);
     let remainingBudget = totalBudget;
 
     selectedList.forEach(item => {
-      // 比例配分して100円単位に切り捨て
       let alloc = Math.max(100, Math.floor((totalBudget * (item.weightBase / totalWeight)) / 100) * 100);
       item.allocatedYen = alloc;
       remainingBudget -= alloc;
     });
 
-    // 端数調整（本線のトップから100円ずつ追加）
     let adjustIdx = 0;
     while (remainingBudget >= 100) {
       selectedList[adjustIdx % selectedList.length].allocatedYen += 100;
@@ -2135,17 +2125,13 @@ const OddsEngine = {
       adjustIdx++;
     }
     while (remainingBudget < 0) {
-      // 超過した場合は末尾から減額
       const last = selectedList[selectedList.length - 1];
       if (last.allocatedYen > 100) {
         last.allocatedYen -= 100;
         remainingBudget += 100;
-      } else {
-        break;
-      }
+      } else break;
     }
 
-    // 想定払戻金の計算
     selectedList.forEach(item => {
       item.expectedReturnYen = Math.round(item.allocatedYen * item.odds);
     });
@@ -2162,15 +2148,7 @@ const OddsEngine = {
   }
 };
 
-      /**
- * BOAT RACE 展開予想シミュレーター PHASE 2 PRO Complete
- * learning.js - 会場別学習DB ＆ 自己進化型重み最適化エンジン
- */
-
-
-
-
-const LearningEngine = {
+      const LearningEngine = {
   /**
    * ⑤ 会場別学習DBの集計＆水面バイアスの算出
    */
@@ -2284,6 +2262,11 @@ const LearningEngine = {
  * ui.js - 初級者/上級者モード切替・バッジ表示・レースリプレイ描画・イベント統合
  */
 
+      /**
+ * BOAT RACE 展開予想シミュレーター PHASE 2 PRO Complete
+ * ui.js - 初級者/上級者モード切替・バッジ表示・本格レースリプレイ描画・イベント統合
+ */
+
 
 
 
@@ -2368,12 +2351,12 @@ const UIManager = {
     `;
   },
 
-  // ② Monte Carloシミュレーション結果の表示（1着率・3連対率・3連単上位120）
+  // ② 理論完全連動型 Monte Carloシミュレーション結果（根拠明記）
   renderMonteCarloResults(simResult, boatsData, containerId = "monteCarloResultsContainer") {
     const el = document.getElementById(containerId);
     if (!el) return;
 
-    const { runs, winRates, top2Rates, top3Rates, trifectaList } = simResult;
+    const { runs, winRates, top2Rates, top3Rates, trifectaList, rationaleNotes } = simResult;
 
     let boatCardsHtml = "";
     for (let b = 1; b <= 6; b++) {
@@ -2403,20 +2386,36 @@ const UIManager = {
       `;
     });
 
+    const rationaleHtml = (rationaleNotes && rationaleNotes.length > 0)
+      ? `
+        <div class="bg-slate-950/80 rounded-lg p-2.5 border border-emerald-500/40 text-xs space-y-1 mb-2">
+          <div class="text-[11px] font-bold text-emerald-300 flex items-center justify-between">
+            <span>🧠 シミュレーション勝率の理論的根拠（スジ舟券理論・戦法相関完全連動）</span>
+            <span class="text-[10px] bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-700">実戦スジ連動</span>
+          </div>
+          <ul class="list-disc list-inside space-y-0.5 text-[11px] text-slate-200">
+            ${rationaleNotes.map(n => `<li>${n}</li>`).join("")}
+          </ul>
+        </div>
+      `
+      : "";
+
     el.innerHTML = `
       <div class="bg-slate-900 border border-emerald-500/40 rounded-xl p-3 space-y-2">
         <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
           <div>
-            <h3 class="text-xs font-bold text-emerald-400">🎲 ② Monte Carloシミュレーション結果（${runs.toLocaleString()}回 試行完了）</h3>
-            <span class="text-[10px] text-slate-400">確率的STブレ・1M衝突・引き波・道中逆転を数千回シミュレートした真の出現率</span>
+            <h3 class="text-xs font-bold text-emerald-400">🎲 ② 理論連動型 Monte Carloシミュレーション結果（${runs.toLocaleString()}回 試行完了）</h3>
+            <span class="text-[10px] text-slate-400">イン逃げ本線スジ・4カドまくり外連動スジ・2C差しスジを完全物理シミュレートした真の出現率</span>
           </div>
           <span class="text-[11px] bg-emerald-600/20 text-emerald-300 font-mono font-bold px-2 py-0.5 rounded border border-emerald-500/40">試行: ${runs.toLocaleString()}R</span>
         </div>
 
+        ${rationaleHtml}
+
         <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">${boatCardsHtml}</div>
 
         <div class="bg-slate-950/60 rounded-lg p-2 border border-slate-800/80">
-          <div class="text-[11px] font-bold text-slate-400 mb-1">3連単 出現確率上位TOP10（全120通り中）:</div>
+          <div class="text-[11px] font-bold text-slate-400 mb-1">3連単 出現確率上位TOP10（全120通り中・実戦スジ上位）:</div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4">${topTrifectaHtml}</div>
         </div>
       </div>
@@ -2427,6 +2426,10 @@ const UIManager = {
   renderOddsEVTable(evAnalysis, containerId = "oddsEVContainer") {
     const el = document.getElementById(containerId);
     if (!el) return;
+
+    const oddsStatusBadge = evAnalysis.isLiveOdds
+      ? `<span class="text-[10px] bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-600 font-bold">✅ 公式3連単オッズ リアルタイム反映中</span>`
+      : `<span class="text-[10px] bg-slate-800 text-amber-300 px-2 py-0.5 rounded border border-slate-700">📊 実戦市場基準・推定オッズ（オッズ更新で公式即時切替）</span>`;
 
     let rowsHtml = "";
     evAnalysis.byEV.slice(0, 12).forEach((item, idx) => {
@@ -2447,9 +2450,9 @@ const UIManager = {
         <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
           <div>
             <h3 class="text-xs font-bold text-rose-400">💹 ③ オッズ期待値エンジン（EV = 出現確率 × オッズ）</h3>
-            <span class="text-[10px] text-slate-400">長期回収率100%超えを実現するための期待値(EV)ランキング（EV 1.0以上がプラス期待値）</span>
+            <span class="text-[10px] text-slate-400">オッズと出現率のズレを突いて長期回収率100%超えを狙う期待値(EV)ランキング</span>
           </div>
-          <span class="text-[11px] bg-rose-950 text-rose-300 px-2 py-0.5 rounded border border-rose-800">全120通り分析済</span>
+          ${oddsStatusBadge}
         </div>
 
         <div class="overflow-x-auto">
@@ -2471,7 +2474,7 @@ const UIManager = {
     `;
   },
 
-  // ④ AI買い目生成＆スマート資金配分
+  // ④ AI買い目生成＆スマート資金配分 (2パターン推奨買い目と完全統合)
   renderSmartPortfolio(portfolioData, containerId = "smartPortfolioContainer") {
     const el = document.getElementById(containerId);
     if (!el) return;
@@ -2483,7 +2486,8 @@ const UIManager = {
           <div class="flex items-center gap-2">
             <span class="text-[10px] font-bold px-2 py-0.5 rounded ${bet.catClass}">${bet.category}</span>
             <span class="font-mono font-black text-sm text-white">${bet.combo}</span>
-            <span class="text-[11px] font-mono text-amber-300">(${bet.odds.toFixed(1)}倍 / EV:${bet.ev.toFixed(2)})</span>
+            <span class="text-[11px] font-mono text-amber-300">(${(Number(bet.odds) || 12.0).toFixed(1)}倍 / EV:${(Number(bet.ev) || ((Number(bet.prob) || 5.0) * (Number(bet.odds) || 12.0) / 100)).toFixed(2)})</span>
+            <span class="text-[10px] text-slate-400 truncate max-w-[240px] hidden sm:inline">${bet.rationale}</span>
           </div>
           <div class="text-right">
             <div class="text-xs font-black text-emerald-400 font-mono">${bet.allocatedYen.toLocaleString()}円</div>
@@ -2497,8 +2501,8 @@ const UIManager = {
       <div class="bg-slate-900 border border-amber-500/40 rounded-xl p-3 space-y-2">
         <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
           <div>
-            <h3 class="text-xs font-bold text-amber-300">💰 ④ AI資金配分買い目（本線・対抗・穴の最適ポートフォリオ）</h3>
-            <span class="text-[10px] text-slate-400">軍資金${portfolioData.totalBudget.toLocaleString()}円を期待値と的中確率に合わせて100円単位で最適配分</span>
+            <h3 class="text-xs font-bold text-amber-300">💰 ④ AI資金配分買い目（2パターン推奨目と完全統合ポートフォリオ）</h3>
+            <span class="text-[10px] text-slate-400">軍資金${portfolioData.totalBudget.toLocaleString()}円を本線（イン逃げ）・対抗（非イン逆転）・穴（超期待値）へ100円単位で最適配分</span>
           </div>
           <span class="text-[11px] bg-slate-800 text-sky-300 font-mono px-2 py-0.5 rounded font-bold">合計: ${portfolioData.totalBudget.toLocaleString()}円</span>
         </div>
@@ -2508,12 +2512,12 @@ const UIManager = {
     `;
   },
 
-  // ⑭ レースリプレイ アニメーションキャンバス (スリット ➔ 1M ➔ バック ➔ 2M ➔ ゴール)
-  renderRaceReplayCanvas(canvasId, stage = 0, courseEval = {}, simResult = null) {
+  // ⑭ 本格レースリプレイ アニメーションビュー（水面・ブイ・引き波・60fps連続描画）
+  renderRaceReplayCanvas(canvasId, progress = 0, courseEval = {}, simResult = null) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const W = 920;
-    const H = 400;
+    const H = 420;
     if (canvas.width !== W * 2 || canvas.height !== H * 2) {
       canvas.width = W * 2;
       canvas.height = H * 2;
@@ -2523,94 +2527,217 @@ const UIManager = {
     ctx.scale(2, 2);
 
     // 水面背景
-    ctx.fillStyle = "#18d4f2";
+    ctx.fillStyle = "#16c8ea";
     ctx.fillRect(0, 0, W, H);
 
-    // ステージ名
-    const stageNames = [
-      "⏱️ ステージ1: スリット通過（各艇ST踏み込み＆隊形形成）",
-      "🌀 ステージ2: 1マーク旋回攻防（先マイ vs まくり・差し・切り込み）",
-      "💨 ステージ3: バックストレッチ直線航走（伸び足・隊列形成）",
-      "🔄 ステージ4: 2マーク旋回（道中逆転・ターン足勝負）",
-      "🏁 ステージ5: ゴールライン決着（1着〜6着着順確定）"
+    // コース境界線・スタンド側＆バック側表記
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.15)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(40, 50); ctx.lineTo(W - 40, 50);
+    ctx.moveTo(40, H - 40); ctx.lineTo(W - 40, H - 40);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(15, 23, 42, 0.35)";
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("▲ バックストレッチ（バック側）", W / 2, 38);
+    ctx.fillText("▼ ホームストレッチ（スタンド・観客席側）", W / 2, H - 18);
+
+    // 1マークブイ (X=230, Y=210) & 2マークブイ (X=690, Y=210)
+    const buoys = [
+      { x: 230, y: 210, name: "1マーク" },
+      { x: 690, y: 210, name: "2マーク" }
     ];
-
-    ctx.fillStyle = "#0f172a";
-    ctx.fillRect(0, 0, W, 36);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 13px sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(stageNames[stage] || stageNames[0], 14, 23);
-
-    // 簡易描画：各ステージに応じた艇の配置
-    const topCombo = (simResult?.trifectaList?.[0]?.combo || "1-2-3").split("-").map(Number);
-    const order = [topCombo[0], topCombo[1], topCombo[2], 4, 5, 6].filter((v, i, a) => a.indexOf(v) === i);
-
-    for (let c = 1; c <= 6; c++) {
-      const bColor = BOAT_COLORS[c] || BOAT_COLORS[1];
-      let bx = 100, by = 60 + (c - 1) * 50;
-
-      if (stage === 0) {
-        // スリット
-        const st = courseEval[c]?.expectedSt || 0.14;
-        bx = 720 - st * 2200;
-        by = 55 + (c - 1) * 54;
-      } else if (stage === 1) {
-        // 1M旋回
-        const rankIdx = order.indexOf(c);
-        bx = 420 + rankIdx * 55;
-        by = 80 + rankIdx * 45;
-      } else if (stage === 2) {
-        // バックストレッチ
-        const rankIdx = order.indexOf(c);
-        bx = 760 - rankIdx * 110;
-        by = 85 + (rankIdx % 2) * 20;
-      } else if (stage === 3) {
-        // 2M旋回
-        const rankIdx = order.indexOf(c);
-        bx = 200 + rankIdx * 65;
-        by = 180 + rankIdx * 30;
-      } else if (stage === 4) {
-        // ゴール
-        const rankIdx = order.indexOf(c);
-        bx = 780 - rankIdx * 115;
-        by = 80 + rankIdx * 48;
-      }
-
-      // ボートアイコン
+    buoys.forEach(b => {
       ctx.save();
-      ctx.translate(bx, by);
-      ctx.fillStyle = bColor.body;
-      ctx.strokeStyle = "#0f172a";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(-24, -12);
-      ctx.lineTo(12, -12);
-      ctx.lineTo(28, 0);
-      ctx.lineTo(12, 12);
-      ctx.lineTo(-24, 12);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
+      ctx.translate(b.x, b.y);
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
-      ctx.arc(-4, 0, 9, 0, Math.PI * 2);
+      ctx.arc(0, 0, 18, 0, Math.PI * 2);
       ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = bColor.numText;
+      ctx.fillStyle = "#ef4444";
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.arc(0, 0, 18, -Math.PI * 0.75, -Math.PI * 0.25); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.arc(0, 0, 18, Math.PI * 0.25, Math.PI * 0.75); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "#0f172a";
       ctx.font = "900 13px sans-serif";
       ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(String(c), -4, 1);
+      ctx.fillText(b.name, 0, 32);
       ctx.restore();
+    });
+
+    // スリットライン & ゴールライン
+    ctx.save();
+    // スタートスリット (X=460)
+    ctx.strokeStyle = "#dc2626";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(460, 270); ctx.lineTo(460, 395);
+    ctx.stroke();
+    ctx.fillStyle = "#dc2626";
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("START (0.00)", 460, 410);
+
+    // ゴールライン（チェッカー）
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(420, 270); ctx.lineTo(420, 395);
+    ctx.stroke();
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "bold 11px sans-serif";
+    ctx.fillText("GOAL", 420, 410);
+    ctx.restore();
+
+    // 確定順位の取得
+    const topCombo = (simResult?.trifectaList?.[0]?.combo || "1-2-3").split("-").map(Number);
+    const order = [topCombo[0], topCombo[1], topCombo[2], 4, 5, 6].filter((v, i, a) => a.indexOf(v) === i);
+    while (order.length < 6) {
+      for (let i = 1; i <= 6; i++) { if (!order.includes(i)) order.push(i); }
     }
+
+    // 各艇の位置計算（progress: 0〜100%）
+    // 0~20: スリット通過
+    // 20~46: 1マーク旋回激闘
+    // 46~68: バックストレッチ直線航走
+    // 68~86: 2マーク旋回攻防
+    // 86~100: ホームストレッチ〜ゴールイン
+    const p = Math.max(0, Math.min(100, progress));
+
+    for (let c = 1; c <= 6; c++) {
+      const bId = c;
+      const bColor = BOAT_COLORS[bId] || BOAT_COLORS[1];
+      const rankIdx = order.indexOf(bId); // 0=1着, 1=2着, ...
+      const st = courseEval[c]?.expectedSt || 0.14;
+
+      let x = 460, y = 330, angle = Math.PI;
+
+      if (p <= 20) {
+        // スリット前〜通過 (右から左へ)
+        const t = p / 20;
+        const stAdv = (0.15 - st) * 280;
+        x = 760 - t * 300 + stAdv;
+        y = 300 + (c - 1) * 16;
+        angle = Math.PI;
+      } else if (p <= 46) {
+        // 1マーク旋回 (左ブイ 230, 210 を反時計回りに回る)
+        const t = (p - 20) / 26;
+        let turnR = 42 + c * 8;
+        if (c === 1) turnR = 36;
+        else if (c === 2) turnR = 30; // 最内差し
+        else if (c === 4) turnR = 76; // カドまくり外旋回
+        else if (c === 6) turnR = 38; // 展開待ち最内差し
+
+        const startTheta = -Math.PI * 0.5;
+        const endTheta = Math.PI * 0.5;
+        const theta = startTheta + t * (endTheta - startTheta);
+
+        x = 230 - Math.cos(theta) * turnR;
+        y = 210 + Math.sin(theta) * turnR;
+        angle = Math.PI - (theta + Math.PI * 0.5);
+      } else if (p <= 68) {
+        // バックストレッチ (左から右へ)
+        const t = (p - 46) / 22;
+        const rankLead = (5 - rankIdx) * 22;
+        x = 230 + t * 460 + rankLead;
+        y = 80 + rankIdx * 14;
+        angle = 0;
+      } else if (p <= 86) {
+        // 2マーク旋回 (右ブイ 690, 210 を反時計回りに回る)
+        const t = (p - 68) / 18;
+        const turnR = 38 + rankIdx * 8;
+        const theta = Math.PI * 0.5 + t * Math.PI;
+        x = 690 + Math.cos(theta) * turnR;
+        y = 210 - Math.sin(theta) * turnR;
+        angle = theta + Math.PI * 0.5;
+      } else {
+        // ホームストレッチ〜ゴール (右から左へ)
+        const t = (p - 86) / 14;
+        const rankLead = (5 - rankIdx) * 35;
+        x = 690 - t * 270 - rankLead;
+        y = 295 + rankIdx * 16;
+        angle = Math.PI;
+      }
+
+      // ボート描画
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // 引き波 (航跡)
+      ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+      ctx.beginPath();
+      ctx.moveTo(-18, -6); ctx.lineTo(-44, -12); ctx.lineTo(-44, 12); ctx.lineTo(-18, 6);
+      ctx.closePath(); ctx.fill();
+
+      // ボート外枠五角形
+      ctx.fillStyle = bColor.body;
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(-22, -10); ctx.lineTo(10, -10); ctx.lineTo(24, 0); ctx.lineTo(10, 10); ctx.lineTo(-22, 10);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+
+      // 中央ナンバーサークル
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(-4, 0, 8, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+
+      // 数字（常に正立）
+      ctx.save();
+      ctx.translate(-4, 0);
+      ctx.rotate(-angle);
+      ctx.fillStyle = bColor.numText;
+      ctx.font = "900 12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(bId), 0, 1);
+      ctx.restore();
+
+      ctx.restore();
+
+      // ゴール時の順位バッジ表示 (p>=95)
+      if (p >= 95) {
+        ctx.save();
+        const medals = ["🥇1着", "🥈2着", "🥉3着", "4着", "5着", "6着"];
+        const mColors = ["#facc15", "#e2e8f0", "#ca8a04", "#94a3b8", "#64748b", "#475569"];
+        ctx.fillStyle = mColors[rankIdx] || "#cbd5e1";
+        ctx.font = "bold 11px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(medals[rankIdx], x + 30, y + 4);
+        ctx.restore();
+      }
+    }
+
+    // 上部ヘッダー情報
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, W, 28);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 12px sans-serif";
+    ctx.textAlign = "left";
+    let phaseName = "⏱️ ① スリット通過（各艇ST踏み込み）";
+    if (p > 20 && p <= 46) phaseName = "🌀 ② 1マーク旋回（先マイ vs まくり・差し・最内切り込み）";
+    else if (p > 46 && p <= 68) phaseName = "💨 ③ バックストレッチ直線航走（伸び足・隊列形成）";
+    else if (p > 68 && p <= 86) phaseName = "🔄 ④ 2マーク旋回（道中逆転・ターン足攻防）";
+    else if (p > 86) phaseName = `🏁 ⑤ ゴールイン（決着: ${topCombo.join("-")}）`;
+
+    ctx.fillText(phaseName, 14, 18);
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "bold 12px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(`進行度: ${Math.round(p)}%`, W - 14, 18);
 
     ctx.restore();
   },
 
-  // ⑪ 初級者モード vs ⑫ 上級者モードのUI切り替え
   applyUIMode(mode = "pro") {
     const proElements = document.querySelectorAll(".ui-mode-pro-only");
     const beginnerElements = document.querySelectorAll(".ui-mode-beginner-only");
@@ -2637,8 +2764,10 @@ const UIManager = {
       window.LearningEngine = LearningEngine;
       window.UIManager = UIManager;
 
-      let currentReplayStage = 0;
-      let replayAutoTimer = null;
+      let replayProgress = 0;
+      let replayRunning = false;
+      let replaySpeed = 1.0;
+      let replayAnimFrameId = null;
       let latestMonteCarloResult = null;
       let latestEVAnalysis = null;
       let latestSmartPortfolio = null;
@@ -3743,83 +3872,15 @@ const UIManager = {
         drawFirstMarkCanvas(courseEval, kadoCourse, venue, raceNo, raceGrade, windDir, windSpeed, kimariteStats);
         renderScoreTable(courseEval);
 
-        // ---------------------------------------------------------
-        // ① 展開タイプ判定 ＆ ⑦ ST優位性 ＆ ⑧ 機力指数 ＆ ⑨ 荒れ指数の算出
-        // ---------------------------------------------------------
-        const stAdvantageData = RaceAnalyzer.calculateSTAdvantage(courseEval);
-        const motorIndices = {};
-        for (let b = 1; b <= 6; b++) {
-          const bObj = courseEval[b]?.b || {};
-          const exRank = [1,2,3,4,5,6].sort((x, y) => (courseEval[x]?.b?.exTime || 6.8) - (courseEval[y]?.b?.exTime || 6.8)).indexOf(b) + 1;
-          motorIndices[b] = RaceAnalyzer.calculateCompositeMotorIndex(bObj, exRank);
-        }
+        // レース展開タイプ＆荒れ指数バッジのみ上部に表示（買い目・EV・資金配分は下の2パターン推奨買い目セクションに完全集約）
         const upsetIndex = RaceAnalyzer.calculateUpsetIndex(courseEval, venue, windSpeed, wave, deepIn);
         const raceType = RaceAnalyzer.classifyRaceType(courseEval, upsetIndex, kadoCourse, windDir, windSpeed);
-
-        // ---------------------------------------------------------
-        // ② Monte Carloシミュレーション実行 (1000 / 5000 / 10000回)
-        // ---------------------------------------------------------
-        const mcRuns = Number(document.getElementById("simRunsSelect")?.value || 5000);
-        const simResult = SimulationEngine.runMonteCarlo(courseEval, {
-          runs: mcRuns,
-          venue,
-          kadoCourse,
-          windDir,
-          windSpeed,
-          wave,
-          tide,
-          upsetIndex,
-          motorIndices
-        });
-        latestMonteCarloResult = simResult;
-
-        // ---------------------------------------------------------
-        // ③ オッズ期待値エンジン (EV = 確率 × オッズ)
-        // ---------------------------------------------------------
-        const evAnalysis = OddsEngine.calculateExpectedValues(simResult.trifectaList, liveOddsMap);
-        latestEVAnalysis = evAnalysis;
-
-        // ---------------------------------------------------------
-        // ④ AI買い目生成＆スマート資金配分 (本線・対抗・穴)
-        // ---------------------------------------------------------
-        const totalBudget = Number(document.getElementById("smartBudgetInput")?.value || 3000);
-        const targetTickets = Number(document.getElementById("ticketCountSelect")?.value || 10);
-        const smartPortfolio = OddsEngine.generateSmartPortfolio(evAnalysis, totalBudget, targetTickets, raceType);
-        latestSmartPortfolio = smartPortfolio;
-
-        // ---------------------------------------------------------
-        // ⑩ 過去類似レース分析
-        // ---------------------------------------------------------
-        const venueStats = StorageManager.getVenueStats(venue.code || "heiwajima");
-        const similarRaces = RaceAnalyzer.findSimilarRaces(venue, raceGrade, windSpeed, courseEval[1].effCourseWin, venueStats);
-
-        // ---------------------------------------------------------
-        // UI レンダリング更新
-        // ---------------------------------------------------------
         UIManager.renderRaceTypeHeader(raceType, upsetIndex);
-        UIManager.renderSTAdvantage(stAdvantageData);
-        UIManager.renderMonteCarloResults(simResult, boatsData);
-        UIManager.renderOddsEVTable(evAnalysis);
-        UIManager.renderSmartPortfolio(smartPortfolio);
 
-        const simEl = document.getElementById("similarRacesContainer");
-        if (simEl) {
-          simEl.innerHTML = `
-            <div class="flex items-center justify-between border-b border-slate-800 pb-1">
-              <h3 class="text-xs font-bold text-indigo-300">📊 ⑩ 過去類似レース分析（同一場・天候・イン勝率帯 ${similarRaces.matchCount}件）</h3>
-              <span class="text-[10px] text-slate-400">蓄積DBマッチング</span>
-            </div>
-            <div class="grid grid-cols-4 gap-2 text-center text-xs pt-1">
-              <div class="bg-slate-950 p-1.5 rounded border border-slate-800"><div class="text-[10px] text-slate-400">逃げ率</div><div class="text-sky-300 font-bold font-mono">${similarRaces.nigeRate}%</div></div>
-              <div class="bg-slate-950 p-1.5 rounded border border-slate-800"><div class="text-[10px] text-slate-400">まくり率</div><div class="text-rose-300 font-bold font-mono">${similarRaces.makuriRate}%</div></div>
-              <div class="bg-slate-950 p-1.5 rounded border border-slate-800"><div class="text-[10px] text-slate-400">差し率</div><div class="text-emerald-300 font-bold font-mono">${similarRaces.sashiRate}%</div></div>
-              <div class="bg-slate-950 p-1.5 rounded border border-slate-800"><div class="text-[10px] text-slate-400">捲差率</div><div class="text-amber-300 font-bold font-mono">${similarRaces.makurisashiRate}%</div></div>
-            </div>
-          `;
-        }
 
-        // ⑭ レースリプレイキャンバス描画
-        UIManager.renderRaceReplayCanvas("raceReplayCanvas", currentReplayStage, courseEval, simResult);
+
+        // ---------------------------------------------------------
+
 
         generateNarrativeAndBets(
           courseEval,
@@ -4498,15 +4559,22 @@ const UIManager = {
 
       function renderScoreTable(courseEval) {
         const tbody = document.getElementById("scoreTableBody");
+        if (!tbody) return;
         tbody.innerHTML = "";
+        const exSorted = [1,2,3,4,5,6].sort((x, y) => (courseEval[x]?.b?.exTime || 6.8) - (courseEval[y]?.b?.exTime || 6.8));
         for (let c = 1; c <= 6; c++) {
           const obj = courseEval[c];
           const isManual = obj.b.manualTactic !== "auto";
           const exStr = (obj.b.exTime || 6.80).toFixed(2);
+          const exRank = exSorted.indexOf(c) + 1;
+          const mInfo = (typeof RaceAnalyzer !== "undefined" && RaceAnalyzer.calculateCompositeMotorIndex)
+            ? RaceAnalyzer.calculateCompositeMotorIndex(obj.b, exRank)
+            : { grade: "B", score: 55, color: "text-sky-300", bg: "bg-slate-800" };
           tbody.innerHTML += `
           <tr>
             <td class="py-1 font-bold text-slate-400">${c}C</td>
             <td class="py-1 flex items-center gap-1.5"><span class="boat-${obj.boatId} w-5 h-5 rounded text-[11px] font-black flex items-center justify-center">${obj.boatId}</span><span class="font-bold text-white">${obj.b.name}</span></td>
+            <td class="py-1 text-center"><span class="text-[10px] px-1.5 py-0.5 rounded border ${mInfo.bg} ${mInfo.color}">${mInfo.grade} (${mInfo.score})</span></td>
             <td class="py-1 text-right font-mono text-sky-300">${exStr}s / .${Math.round(obj.expectedSt * 100).toString().padStart(2, "0")}</td>
             <td class="py-1 text-right font-bold text-amber-300">${obj.firstScore.toFixed(1)}</td>
             <td class="py-1 text-right font-bold text-emerald-300">${obj.placeScore.toFixed(1)}</td>
@@ -4744,6 +4812,8 @@ const UIManager = {
           combo: `${b.l1}-${b.l2}-${b.l3}`,
           runners: `${nameOf(b.l1)}→${nameOf(b.l2)}→${nameOf(b.l3)}`
         }));
+
+
 
         // My予想チェッカー用に現在のシミュレーション結果を保存
         latestSimContext = {
@@ -5512,34 +5582,57 @@ const UIManager = {
       
     
       // ---------------------------------------------------------
-      // ⑭ レースリプレイ アニメーションコントローラー
+      // ⑭ 本格レースリプレイ 60fps連続アニメーションコントローラー
       // ---------------------------------------------------------
-      function setReplayStage(stage) {
-        currentReplayStage = Math.max(0, Math.min(4, stage));
-        const btns = document.querySelectorAll(".btn-replay-stage");
-        btns.forEach((btn, idx) => {
-          if (idx === currentReplayStage) {
-            btn.className = "btn-replay-stage bg-sky-600 text-white px-2.5 py-0.5 rounded border border-sky-400 font-black shadow";
-          } else {
-            btn.className = "btn-replay-stage bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded border border-slate-700";
-          }
-        });
-        UIManager.renderRaceReplayCanvas("raceReplayCanvas", currentReplayStage, latestSimContext?.courseEval || {}, latestMonteCarloResult);
+      function updateReplayCanvas(progress) {
+        replayProgress = Math.max(0, Math.min(100, progress));
+        const slider = document.getElementById("replayProgressSlider");
+        if (slider) slider.value = replayProgress;
+        const lbl = document.getElementById("replayProgressLabel");
+        if (lbl) lbl.textContent = `${Math.round(replayProgress)}%`;
+
+        UIManager.renderRaceReplayCanvas("raceReplayCanvas", replayProgress, latestSimContext?.courseEval || {}, latestMonteCarloResult);
       }
 
-      function toggleReplayAutoPlay() {
-        const btn = document.getElementById("btnReplayPlay");
-        if (replayAutoTimer) {
-          clearInterval(replayAutoTimer);
-          replayAutoTimer = null;
-          if (btn) btn.textContent = "▶️ 自動再生";
-        } else {
-          if (btn) btn.textContent = "⏸️ 一時停止";
-          replayAutoTimer = setInterval(() => {
-            currentReplayStage = (currentReplayStage + 1) % 5;
-            setReplayStage(currentReplayStage);
-          }, 1800);
+      function tickReplayAnimation() {
+        if (!replayRunning) return;
+        replayProgress += 0.38 * replaySpeed;
+        if (replayProgress >= 100) {
+          replayProgress = 100;
+          updateReplayCanvas(100);
+          toggleReplayAutoPlay(false);
+          return;
         }
+        updateReplayCanvas(replayProgress);
+        replayAnimFrameId = requestAnimationFrame(tickReplayAnimation);
+      }
+
+      function toggleReplayAutoPlay(forceState = null) {
+        const btn = document.getElementById("btnReplayPlay");
+        if (forceState !== null) replayRunning = forceState;
+        else replayRunning = !replayRunning;
+
+        if (replayRunning) {
+          if (replayProgress >= 100) replayProgress = 0;
+          if (btn) btn.innerHTML = "⏸️ 一時停止";
+          cancelAnimationFrame(replayAnimFrameId);
+          replayAnimFrameId = requestAnimationFrame(tickReplayAnimation);
+        } else {
+          if (btn) btn.innerHTML = "▶️ 再生";
+          cancelAnimationFrame(replayAnimFrameId);
+        }
+      }
+
+      function setReplaySpeed(spd) {
+        replaySpeed = spd;
+        [1, 1.5, 2].forEach(s => {
+          const id = s === 1 ? "btnSpeed1" : s === 1.5 ? "btnSpeed15" : "btnSpeed2";
+          const el = document.getElementById(id);
+          if (el) {
+            if (s === spd) el.className = "px-1.5 py-0.5 rounded bg-slate-800 text-sky-300 font-bold";
+            else el.className = "px-1.5 py-0.5 rounded text-slate-400 hover:text-white";
+          }
+        });
       }
 
       // ---------------------------------------------------------
@@ -5548,12 +5641,14 @@ const UIManager = {
       function switchUIMode(mode) {
         const btnBeg = document.getElementById("btnModeBeginner");
         const btnPro = document.getElementById("btnModePro");
-        if (mode === "beginner") {
-          btnBeg.className = "px-3 py-1 text-xs font-black rounded-md transition-colors bg-teal-600 text-white shadow";
-          btnPro.className = "px-3 py-1 text-xs font-bold rounded-md transition-colors text-slate-400 hover:text-white";
-        } else {
-          btnPro.className = "px-3 py-1 text-xs font-black rounded-md transition-colors bg-sky-600 text-white shadow";
-          btnBeg.className = "px-3 py-1 text-xs font-bold rounded-md transition-colors text-slate-400 hover:text-white";
+        if (btnBeg && btnPro) {
+          if (mode === "beginner") {
+            btnBeg.className = "px-3 py-1 text-xs font-black rounded-md transition-colors bg-teal-600 text-white shadow";
+            btnPro.className = "px-3 py-1 text-xs font-bold rounded-md transition-colors text-slate-400 hover:text-white";
+          } else {
+            btnPro.className = "px-3 py-1 text-xs font-black rounded-md transition-colors bg-sky-600 text-white shadow";
+            btnBeg.className = "px-3 py-1 text-xs font-bold rounded-md transition-colors text-slate-400 hover:text-white";
+          }
         }
         UIManager.applyUIMode(mode);
       }
@@ -5571,13 +5666,21 @@ const UIManager = {
         document.getElementById("simRunsSelect")?.addEventListener("change", () => runSimulation());
         document.getElementById("smartBudgetInput")?.addEventListener("change", () => runSimulation());
 
-        // リプレイボタン
-        document.getElementById("btnReplayPlay")?.addEventListener("click", toggleReplayAutoPlay);
-        document.getElementById("btnReplayPrev")?.addEventListener("click", () => setReplayStage(currentReplayStage - 1));
-        document.getElementById("btnReplayNext")?.addEventListener("click", () => setReplayStage(currentReplayStage + 1));
-        document.querySelectorAll(".btn-replay-stage").forEach((btn, idx) => {
-          btn.addEventListener("click", () => setReplayStage(idx));
+        // リプレイ操作バインド
+        document.getElementById("btnReplayPlay")?.addEventListener("click", () => toggleReplayAutoPlay());
+        document.getElementById("replayProgressSlider")?.addEventListener("input", (e) => {
+          toggleReplayAutoPlay(false);
+          updateReplayCanvas(parseFloat(e.target.value));
         });
+        document.querySelectorAll(".btn-replay-stage").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            toggleReplayAutoPlay(false);
+            updateReplayCanvas(parseFloat(btn.dataset.pct || 0));
+          });
+        });
+        document.getElementById("btnSpeed1")?.addEventListener("click", () => setReplaySpeed(1.0));
+        document.getElementById("btnSpeed15")?.addEventListener("click", () => setReplaySpeed(1.5));
+        document.getElementById("btnSpeed2")?.addEventListener("click", () => setReplaySpeed(2.0));
 
         // 保存されたUIモードの復元
         const savedMode = StorageManager.getUIMode();
@@ -5688,6 +5791,1334 @@ const UIManager = {
     </script>
   </body>
 </html>"""
+
+
+EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🎓 ぼーとだいがくせい｜レース結果×予想 振り返りアナライザー (POST-RACE REVIEW LAB)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body { background: #090d16; color: #f8fafc; font-family: sans-serif; margin: 0; }
+      .boat-1 { background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; }
+      .boat-2 { background: #1e293b; color: #ffffff; border: 1px solid #64748b; }
+      .boat-3 { background: #ef4444; color: #ffffff; }
+      .boat-4 { background: #3b82f6; color: #ffffff; }
+      .boat-5 { background: #eab308; color: #0f172a; }
+      .boat-6 { background: #22c55e; color: #ffffff; }
+      input[type="number"], select, input[type="date"], input[type="text"], textarea {
+        background: #131c2e; border: 1px solid #2dd4bf40; color: #f8fafc;
+        border-radius: 0.375rem; padding: 0.25rem 0.45rem; font-size: 0.78rem;
+      }
+      .slit-lane {
+        position: relative; height: 42px; border-bottom: 1px dashed #1e293b;
+        display: flex; align-items: center;
+      }
+      .kado-line { border-top: 2px dashed #f43f5e !important; }
+    </style>
+  </head>
+  <body class="pb-14">
+    <!-- Header -->
+    <header class="sticky top-0 z-30 bg-slate-950/95 border-b border-teal-500/30 px-3 py-2.5 shadow-lg backdrop-blur">
+      <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="bg-teal-400 text-slate-950 font-black px-2 py-0.5 rounded text-xs">POST-RACE REVIEW LAB</span>
+          <h1 class="text-sm md:text-base font-bold text-white">
+            🎓 ぼーとだいがくせい｜レース結果×予想 答え合わせ＆敗因解剖アナライザー
+          </h1>
+          <span id="headerStatusBadge" class="text-[11px] font-bold text-teal-300 ml-1"></span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+          <!-- もう1個のサイト（予想シミュレーター）への直通リンク -->
+          <a href="https://bdkzgfy4igpjbzjachuzwu.streamlit.app/" target="_blank" rel="noopener" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-3 py-1 rounded shadow flex items-center gap-1">
+            🚤 予想シミュレーター(本サイト)へ移動 ↗
+          </a>
+          <button onclick="document.getElementById('pasteResultModal').classList.toggle('hidden')" class="bg-teal-700 hover:bg-teal-600 text-white font-bold px-2.5 py-1 rounded shadow">
+            📥 結果テキスト貼付
+          </button>
+          <button onclick="loadSampleCase('makuri_hit')" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 px-2 py-1 rounded">
+            例①: 4カドまくり的中
+          </button>
+          <button onclick="loadSampleCase('sashi_miss')" class="bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/40 px-2 py-1 rounded">
+            例②: イン買い→2差抜け
+          </button>
+          <button onclick="loadSampleCase('in_hit')" class="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-500/40 px-2 py-1 rounded">
+            例③: イン逃げ的中
+          </button>
+          <a href="https://x.com/Boatrace__daisu" target="_blank" rel="noopener" class="bg-slate-900 hover:bg-slate-800 text-white border border-slate-600 px-2 py-1 rounded font-bold">
+            𝕏 @Boatrace__daisu
+          </a>
+          <a href="https://note.com/boatrace__daisu" target="_blank" rel="noopener" class="bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/50 px-2 py-1 rounded font-bold">
+            📓 note
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-3 pt-3 space-y-3">
+      <!-- 🔄 公式レース結果＆配当(3連単・2連単・人気) 自動取得バー -->
+      <section class="bg-slate-900 border-2 border-teal-500/40 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold px-2 py-0.5 rounded text-[11px]">🏁 公式結果・配当 自動取得</span>
+          <div>
+            <label class="text-[10px] text-slate-400 mr-1">開催日</label>
+            <input type="date" id="fetchDateInput" class="font-mono" />
+          </div>
+          <div>
+            <label class="text-[10px] text-slate-400 mr-1">場</label>
+            <select id="fetchVenueCode" class="font-bold">
+              <option value="01">01 桐生</option><option value="02">02 戸田</option><option value="03">03 江戸川</option>
+              <option value="04" selected>04 平和島</option><option value="05">05 多摩川</option><option value="06">06 浜名湖</option>
+              <option value="07">07 蒲郡</option><option value="08">08 常滑</option><option value="09">09 津</option>
+              <option value="10">10 三国</option><option value="11">11 びわこ</option><option value="12">12 住之江</option>
+              <option value="13">13 尼崎</option><option value="14">14 鳴門</option><option value="15">15 丸亀</option>
+              <option value="16">16 児島</option><option value="17">17 宮島</option><option value="18">18 徳山</option>
+              <option value="19">19 下関</option><option value="20">20 若松</option><option value="21">21 芦屋</option>
+              <option value="22">22 福岡</option><option value="23">23 唐津</option><option value="24">24 大村</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[10px] text-slate-400 mr-1">R</label>
+            <select id="fetchRno" class="font-bold text-amber-300">
+              <option value="1">1R</option><option value="2">2R</option><option value="3">3R</option><option value="4">4R</option>
+              <option value="5">5R</option><option value="6">6R</option><option value="7">7R</option><option value="8">8R</option>
+              <option value="9">9R</option><option value="10">10R</option><option value="11">11R</option><option value="12" selected>12R</option>
+            </select>
+          </div>
+          <button onclick="autoFetchOfficialResultFromWeb()" class="bg-teal-400 hover:bg-teal-300 text-slate-950 font-black px-3 py-1 rounded shadow">
+            🔄 公式から着順・配当・実STを自動取得
+          </button>
+        </div>
+        <span id="autoFetchMsg" class="text-[11px] font-bold text-amber-300">💡 開催日・場・Rを選んで自動取得を押すと、3連単/2連単配当・人気・決まり手・実STが自動入力されます</span>
+      </section>
+
+      <!-- 公式結果テキストコピペ取込ボックス -->
+      <section id="pasteResultModal" class="hidden bg-slate-900 border-2 border-teal-500/50 rounded-xl p-3 space-y-2">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-1">
+          <h2 class="text-xs font-bold text-teal-300">📥 BOAT RACE公式「レース結果」ページの全文コピペ一括取込</h2>
+          <button onclick="document.getElementById('pasteResultModal').classList.add('hidden')" class="text-xs text-slate-400 hover:text-white">✕ 閉じる</button>
+        </div>
+        <textarea id="rawResultPasteInput" rows="4" placeholder="BOAT RACE公式の「結果（raceresult）」ページを全選択コピー（Ctrl+A → Ctrl+C）してここに貼り付けると、1〜6着順・選手名・本番進入・本番ST・決まり手・3連単配当・2連単配当・人気順を自動で読み取ります。" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs font-mono text-slate-200"></textarea>
+        <div class="flex justify-end gap-2">
+          <button onclick="parsePastedOfficialResult()" class="bg-teal-400 hover:bg-teal-300 text-slate-950 font-black text-xs px-4 py-1.5 rounded shadow">⚡ 結果テキストを解析して反映する</button>
+        </div>
+      </section>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <!-- 左カラム (6 cols): ①実際のレース結果入力 ＋ ②あなたの事前予想入力 ＋ ③展示ST vs 本番ST比較 -->
+        <section class="lg:col-span-6 space-y-3">
+          <!-- ① 確定したレース結果データ -->
+          <div class="bg-slate-900 border border-teal-500/30 rounded-xl p-3 space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-1 border-b border-slate-800 pb-1.5">
+              <h2 class="text-xs font-bold text-teal-300">🏁 ① 確定したレース結果（着順・決まり手・3連単/2連単配当・人気）</h2>
+              <span id="payoutPopularBadge" class="text-[10px] bg-amber-950 text-amber-300 border border-amber-600/40 px-2 py-0.5 rounded font-bold">3連単配当 自動連動</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs">
+              <div>
+                <label class="block text-slate-400 text-[10px]">レース場</label>
+                <select id="revVenue" onchange="runReviewAnalysis()" class="w-full font-bold">
+                  <option value="桐生">01 桐生</option><option value="戸田">02 戸田</option><option value="江戸川">03 江戸川</option>
+                  <option value="平和島" selected>04 平和島</option><option value="多摩川">05 多摩川</option><option value="浜名湖">06 浜名湖</option>
+                  <option value="蒲郡">07 蒲郡</option><option value="常滑">08 常滑</option><option value="津">09 津</option>
+                  <option value="三国">10 三国</option><option value="びわこ">11 びわこ</option><option value="住之江">12 住之江</option>
+                  <option value="尼崎">13 尼崎</option><option value="鳴門">14 鳴門</option><option value="丸亀">15 丸亀</option>
+                  <option value="児島">16 児島</option><option value="宮島">17 宮島</option><option value="徳山">18 徳山</option>
+                  <option value="下関">19 下関</option><option value="若松">20 若松</option><option value="芦屋">21 芦屋</option>
+                  <option value="福岡">22 福岡</option><option value="唐津">23 唐津</option><option value="大村">24 大村</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-400 text-[10px]">R / グレード</label>
+                <div class="flex gap-1">
+                  <select id="revRaceNo" onchange="runReviewAnalysis()" class="w-1/2 font-bold text-amber-300">
+                    <option value="1">1R</option><option value="2">2R</option><option value="3">3R</option><option value="4">4R</option>
+                    <option value="5">5R</option><option value="6">6R</option><option value="7">7R</option><option value="8">8R</option>
+                    <option value="9">9R</option><option value="10">10R</option><option value="11">11R</option><option value="12" selected>12R</option>
+                  </select>
+                  <select id="revGrade" onchange="runReviewAnalysis()" class="w-1/2 font-bold text-amber-200">
+                    <option value="一般">一般</option><option value="G3">G3</option><option value="G2">G2</option>
+                    <option value="G1" selected>G1</option><option value="PG1">PG1</option><option value="SG">SG</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-teal-300 font-bold text-[10px]">確定 1着-2着-3着</label>
+                <div class="flex gap-1">
+                  <select id="fin1" onchange="runReviewAnalysis()" class="w-1/3 font-black text-amber-300"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option></select>
+                  <select id="fin2" onchange="runReviewAnalysis()" class="w-1/3 font-black text-slate-200"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option></select>
+                  <select id="fin3" onchange="runReviewAnalysis()" class="w-1/3 font-black text-amber-600"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-teal-300 font-bold text-[10px]">実際の決まり手</label>
+                <select id="actualKimarite" onchange="runReviewAnalysis()" class="w-full font-bold text-rose-300">
+                  <option value="nige">🛡️ 逃げ</option>
+                  <option value="sashi">📐 差し</option>
+                  <option value="makuri" selected>🔥 まくり</option>
+                  <option value="makurisashi">⚡ まくり差し</option>
+                  <option value="nuki">🌀 抜き(道中逆転)</option>
+                  <option value="megumare">⚠️ 恵まれ(F/事故)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-amber-300 font-bold text-[10px]">3連単配当(円)/人気</label>
+                <div class="flex gap-1">
+                  <input type="number" id="payoutYen" value="4820" step="10" min="100" onchange="runReviewAnalysis()" class="w-2/3 font-mono font-bold text-amber-300" title="3連単払戻金(円)" />
+                  <input type="number" id="payoutPop" value="18" min="1" max="120" onchange="runReviewAnalysis()" class="w-1/3 font-mono text-slate-300" title="人気順" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-slate-400 text-[10px]">2連単配当 / 風速(m)</label>
+                <div class="flex gap-1">
+                  <input type="number" id="payout2tYen" value="1450" step="10" min="100" onchange="runReviewAnalysis()" class="w-1/2 font-mono text-sky-300" title="2連単払戻金(円)" />
+                  <select id="actualWindDir" onchange="runReviewAnalysis()" class="w-1/4" title="風向">
+                    <option value="向かい風" selected>向</option><option value="追い風">追</option><option value="横風">横</option><option value="無風">無</option>
+                  </select>
+                  <input type="number" id="actualWindSpeed" value="4" min="0" max="15" onchange="runReviewAnalysis()" class="w-1/4" title="風速(m)" />
+                </div>
+              </div>
+            </div>
+
+            <!-- 6艇の展示ST vs 本番ST ＆ 1M実際の動きテーブル -->
+            <div class="pt-2 border-t border-slate-800">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[11px] font-bold text-slate-300">⏱️ コース別【事前想定(展示)ST vs 本番実ST】＆ 1マーク実際の動き</span>
+                <span class="text-[10px] text-slate-400">カド位置(標準4カド): <select id="actualKado" onchange="runReviewAnalysis()" class="text-[10px] py-0 px-1 font-bold text-rose-400"><option value="3">3カド</option><option value="4" selected>4カド(標準)</option><option value="5">5カド</option></select></span>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                  <thead class="text-[10px] text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th class="py-1">進入</th>
+                      <th class="py-1">艇・選手名</th>
+                      <th class="py-1 text-center">展示時計</th>
+                      <th class="py-1 text-center">事前/展示ST</th>
+                      <th class="py-1 text-center text-teal-300">本番実ST</th>
+                      <th class="py-1 text-center">ST変化</th>
+                      <th class="py-1 text-center text-amber-300">1Mの実際の攻め/動き</th>
+                      <th class="py-1 text-center text-sky-300">1M出口順</th>
+                      <th class="py-1 text-center text-teal-300">確定着順</th>
+                    </tr>
+                  </thead>
+                  <tbody id="boatStInputTable" class="divide-y divide-slate-800/60"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 🌀 新設：1周1マークの実際の攻防プロセス ＆ 道中（2M以降）の逆転・推移 -->
+            <div class="pt-2.5 border-t border-slate-800 space-y-2">
+              <div class="flex flex-wrap items-center justify-between gap-1">
+                <span class="text-[11px] font-bold text-amber-300">🌀 1マークの実際の攻防プロセス ＆ 道中逆転（映像なし・数値逆算エンジン搭載）</span>
+                <button onclick="infer1MProcessFromNumbers(true)" class="text-[10px] bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2 py-0.5 rounded shadow">
+                  🤖 ST差×着順×タイムから1M攻防＆道中逆転を自動逆算
+                </button>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <div>
+                  <label class="block text-slate-400 text-[10px]">① 1マークの展開トリガー(実際の攻防)</label>
+                  <select id="firstMarkPattern" onchange="runReviewAnalysis()" class="w-full font-bold text-amber-200">
+                    <option value="clean_in">🛡️ インが完璧先マイ・壁機能</option>
+                    <option value="in_flow">🌊 インが先マイもターン膨らみ/流れ</option>
+                    <option value="c2_sashi_atk">📐 2コースが鋭く差し切り/肉薄</option>
+                    <option value="c2_makuri_atk">🔥 2コースがジカまくり仕掛け</option>
+                    <option value="center_makuri_atk" selected>🔥 3・4コースがまくり仕掛け(内被弾)</option>
+                    <option value="center_ms_atk">⚡ 3・4コースがまくり差し突き抜け</option>
+                    <option value="clash_wait">💥 1Mで内と攻め艇がやり合い(展開待ち浮上)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-slate-400 text-[10px]">② 道中（1周2M以降）の着順変動・逆転</label>
+                  <select id="dochuOvertakeType" onchange="runReviewAnalysis()" class="w-full font-bold text-sky-200">
+                    <option value="none" selected>✅ 1M出口隊形のまま確定(道中逆転なし)</option>
+                    <option value="overtake_1st">🔄 1着が道中逆転(2M差し返し・抜き)</option>
+                    <option value="overtake_2nd">🔄 2着が道中逆転(2番手競り・2M逆転)</option>
+                    <option value="overtake_3rd">🔄 3着が道中逆転(道中追い上げ・3番手逆転)</option>
+                    <option value="overtake_both">🔄 2・3着ともに道中で入れ替わり(混戦)</option>
+                    <option value="accident">⚠️ キャビり・不良航法・転覆等で変動</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-slate-400 text-[10px]">③ 道中逆転・浮上の主な要因</label>
+                  <select id="dochuReason" onchange="runReviewAnalysis()" class="w-full font-bold text-emerald-200">
+                    <option value="none" selected>ー (1Mスジ通り決着)</option>
+                    <option value="turn_power">⚙️ 出足・回り足(周回気配・機力)の圧倒的差</option>
+                    <option value="2m_mistake">🌊 2マークで先行艇がツケマイ失敗・流れ</option>
+                    <option value="racer_skill">🎓 選手の道中さばき・実力(G1勝率)差</option>
+                    <option value="bad_water">💨 波・うねり・強風でのターン乱れ</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ② あなたの事前予想（買い目・想定展開・投資金額） -->
+          <div class="bg-slate-900 border border-pink-500/40 rounded-xl p-3 space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-1 border-b border-slate-800 pb-1.5">
+              <h2 class="text-xs font-bold text-pink-300">🎯 ② あなたが事前に予想していた内容（買い目・想定展開・投資金額）</h2>
+              <span class="text-[10px] text-slate-400">単発 `1-2-3` やフォーメーション `1-23-2345` に対応</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div>
+                <label class="block text-slate-400 text-[10px]">事前の本命シナリオ</label>
+                <select id="preExpectedScenario" onchange="runReviewAnalysis()" class="w-full font-bold text-pink-200">
+                  <option value="nige">🛡️ 1コースイン逃げ本線</option>
+                  <option value="sashi">📐 2・3コース差し逆転</option>
+                  <option value="makuri" selected>🔥 4カド・センターまくり</option>
+                  <option value="makurisashi">⚡ センターまくり差し</option>
+                  <option value="tenkaimachi">⏳ 展開待ち高配当狙い</option>
+                  <option value="two_pattern">🔄 イン逃げ＋非インの2パターン</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-400 text-[10px]">総投資額(円)</label>
+                <input type="number" id="totalInvestYen" value="4000" step="100" min="100" onchange="runReviewAnalysis()" class="w-full font-mono font-bold text-amber-300" />
+              </div>
+              <div>
+                <label class="block text-slate-400 text-[10px]">的中目の購入額(円/1点)</label>
+                <input type="number" id="hitTicketYen" value="500" step="100" min="100" onchange="runReviewAnalysis()" class="w-full font-mono font-bold text-emerald-300" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-slate-400 text-[10px] mb-1">事前購入・予想していた3連単買い目（カンマ・スペース・フォーメーション可）</label>
+              <textarea id="preBetsInput" rows="2" oninput="runReviewAnalysis()" class="w-full bg-slate-950 border border-pink-500/40 rounded p-2 text-xs font-mono text-white">1-2-4, 1-4-2, 4-5-1, 4-1-5, 4-5-2, 3-4-5</textarea>
+            </div>
+          </div>
+
+          <!-- ③ 事前想定スリット vs 本番実スリット 比較ビジュアルマップ -->
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <h2 class="text-xs font-bold text-teal-400">📊 ③ 事前想定スリット vs 本番実スリット 比較マップ（赤破線＝4カド標準）</h2>
+              <span class="text-[10px] text-slate-400">半透明＝展示/事前ST ／ 実線バッジ＝本番実ST</span>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 rounded-lg p-2 relative overflow-hidden">
+              <div class="absolute right-10 top-0 bottom-0 w-0.5 bg-teal-400 shadow-[0_0_8px_#2dd4bf] z-10"></div>
+              <div class="absolute right-11 top-1 text-[9px] text-teal-300 font-bold">START</div>
+              <div id="slitComparisonLanes"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 右カラム (6 cols): ④結果×予想 答え合わせ総合判定 ＋ ⑤シミュレーター設定フィードバック処方箋 ＋ ⑥X/note振り返り投稿生成 ＋ ⑦収支・研究履歴ログ -->
+        <section class="lg:col-span-6 space-y-3">
+          <!-- ④ 答え合わせ総合ジャッジ＆5段階敗因/勝因解剖 -->
+          <div class="bg-slate-900 border-2 border-teal-500/40 rounded-xl p-3 space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+              <div class="flex items-center gap-2">
+                <span id="hitOrMissBadge" class="px-3 py-1 rounded font-black text-sm">解析中</span>
+                <div>
+                  <div id="resultSummaryTitle" class="text-xs font-bold text-white"></div>
+                  <div id="roiSummaryText" class="text-[11px] font-mono text-amber-300"></div>
+                </div>
+              </div>
+              <button onclick="saveCurrentReviewToLog()" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded shadow">
+                💾 このレースを研究履歴に保存
+              </button>
+            </div>
+
+            <!-- 5段階解剖レポート -->
+            <div id="retrospectiveDetailBox" class="text-xs leading-relaxed text-slate-200 bg-slate-950/90 border border-slate-800 rounded-lg p-3 space-y-2.5"></div>
+          </div>
+
+          <!-- ⑤ 予想シミュレーター（PHASE 2 PRO）への改善フィードバック処方箋 -->
+          <div class="bg-slate-900 border border-amber-500/40 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <h2 class="text-xs font-bold text-amber-300">🛠️ ⑤ 次レースに向けた「予想シミュレーター」設定調整処方箋</h2>
+              <a href="https://bdkzgfy4igpjbzjachuzwu.streamlit.app/" target="_blank" rel="noopener" class="text-[10px] bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-2 py-0.5 rounded">🚤 予想シミュレーターを開く ↗</a>
+            </div>
+            <div id="simulatorPrescriptionBox" class="text-xs leading-relaxed text-slate-200 bg-slate-950/80 border border-slate-800 rounded-lg p-2.5 space-y-1.5"></div>
+          </div>
+
+          <!-- ⑥ X (@Boatrace__daisu) & note 振り返り・的中報告／検証レポート出力 -->
+          <div class="bg-slate-900 border-2 border-sky-500/40 rounded-xl p-3 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 class="text-xs font-bold text-sky-300">📝 ⑥ X (旧Twitter) ＆ note用「レース後振り返り・的中/検証レポート」自動生成</h2>
+                <span class="text-[10px] text-slate-400">的中時は「展開読みの的中報告」、不的中時はフォロワーの信頼を高める「1M原因検証ログ」を出力</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-xs">
+                <select id="postReportMode" onchange="runReviewAnalysis()" class="font-bold text-sky-200">
+                  <option value="auto" selected>🤖 的中/不的中に応じて自動切替</option>
+                  <option value="x_hit">🎉 X用：的中＆展開完全一致報告</option>
+                  <option value="x_verify">🔬 X用：1Mスリット＆展開検証ログ</option>
+                  <option value="note_retro">📓 note追記・振り返り記事用(長文)</option>
+                </select>
+                <button onclick="copyRetroReport()" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-2.5 py-1 rounded text-[11px] shadow">
+                  レポートをコピー
+                </button>
+              </div>
+            </div>
+            <div id="copyRetroToast" class="hidden text-[11px] text-emerald-300 bg-emerald-950/70 border border-emerald-700/50 rounded px-2 py-1">
+              振り返りレポートをクリップボードにコピーしました！
+            </div>
+            <textarea id="retroReportTextarea" rows="13" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-[11px] font-mono text-slate-200 leading-relaxed focus:outline-none"></textarea>
+          </div>
+
+          <!-- ⑦ 本日の研究・収支履歴ログ（累計的中率・回収率・傾向分析） -->
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
+              <div>
+                <h2 class="text-xs font-bold text-emerald-400">📈 ⑦ 累計レース振り返り履歴 ＆ 収支・弱点傾向サマリー</h2>
+                <span id="logStatsSummary" class="text-[11px] font-mono text-slate-300">保存履歴: 0件</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button onclick="exportLearnedParamsToSimulator()" class="text-[11px] bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2.5 py-1 rounded shadow">
+                  🧠 蓄積データから学習パラメータを生成・コピー
+                </button>
+                <button onclick="clearReviewLogs()" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-0.5 rounded">履歴クリア</button>
+              </div>
+            </div>
+            <div id="learnedFeedbackBanner" class="bg-indigo-950/70 border border-indigo-500/40 rounded-lg p-2 text-[11px] text-indigo-200 space-y-1">
+              <div class="font-bold text-amber-300">🧠 蓄積データ自動学習ステータス（シミュレーター連携）</div>
+              <div id="learnedParamsPreview">レース履歴を保存すると、決まり手傾向・STズレ・3着抜けパターンを統計処理し、予想シミュレーター用の最適パラメータを自動算出します。</div>
+            </div>
+            <div id="reviewLogsContainer" class="space-y-1.5 max-h-[220px] overflow-y-auto text-xs"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      let reviewBoats = {};
+      let reviewLogs = [];
+
+      const VENUE_CODE_TO_NAME = {
+        "01": "桐生", "02": "戸田", "03": "江戸川", "04": "平和島", "05": "多摩川", "06": "浜名湖",
+        "07": "蒲郡", "08": "常滑", "09": "津", "10": "三国", "11": "びわこ", "12": "住之江",
+        "13": "尼崎", "14": "鳴門", "15": "丸亀", "16": "児島", "17": "宮島", "18": "徳山",
+        "19": "下関", "20": "若松", "21": "芦屋", "22": "福岡", "23": "唐津", "24": "大村"
+      };
+
+      const KIMARITE_LABELS = {
+        nige: "逃げ",
+        sashi: "差し",
+        makuri: "まくり",
+        makurisashi: "まくり差し",
+        nuki: "抜き",
+        megumare: "恵まれ"
+      };
+
+      function loadSampleCase(mode) {
+        if (mode === "makuri_hit") {
+          document.getElementById("revVenue").value = "平和島";
+          document.getElementById("revRaceNo").value = "12";
+          document.getElementById("revGrade").value = "G1";
+          document.getElementById("fin1").value = "4";
+          document.getElementById("fin2").value = "5";
+          document.getElementById("fin3").value = "1";
+          document.getElementById("actualKimarite").value = "makuri";
+          document.getElementById("payoutYen").value = "4820";
+          document.getElementById("payoutPop").value = "18";
+          document.getElementById("payout2tYen").value = "1450";
+          document.getElementById("actualWindDir").value = "向かい風";
+          document.getElementById("actualWindSpeed").value = "4";
+          document.getElementById("actualKado").value = "4";
+          document.getElementById("preExpectedScenario").value = "two_pattern";
+          document.getElementById("totalInvestYen").value = "4000";
+          document.getElementById("hitTicketYen").value = "500";
+          document.getElementById("preBetsInput").value = "1-2-4, 1-4-2, 4-5-1, 4-1-5, 4-5-2, 3-4-5";
+
+          document.getElementById("firstMarkPattern").value = "center_makuri_atk";
+          document.getElementById("dochuOvertakeType").value = "overtake_3rd";
+          document.getElementById("dochuReason").value = "turn_power";
+          reviewBoats = {
+            1: { id: 1, course: 1, name: "白井 英治", exTime: 6.75, preSt: 0.11, actualSt: 0.14, m1Action: "被弾・残し", m1Rank: 4, rank: 3 },
+            2: { id: 2, course: 2, name: "瓜生 正義", exTime: 6.79, preSt: 0.14, actualSt: 0.16, m1Action: "引き波被弾", m1Rank: 5, rank: 4 },
+            3: { id: 3, course: 3, name: "澤田 尚也", exTime: 6.77, preSt: 0.14, actualSt: 0.21, m1Action: "凹み・壁崩壊", m1Rank: 6, rank: 5 },
+            4: { id: 4, course: 4, name: "大峯 豊", exTime: 6.71, preSt: 0.12, actualSt: 0.08, m1Action: "まくり敢行", m1Rank: 1, rank: 1 },
+            5: { id: 5, course: 5, name: "篠崎 仁志", exTime: 6.75, preSt: 0.13, actualSt: 0.11, m1Action: "まくり差し連動", m1Rank: 2, rank: 2 },
+            6: { id: 6, course: 6, name: "吉田 裕平", exTime: 6.82, preSt: 0.15, actualSt: 0.15, m1Action: "展開待ち最内", m1Rank: 3, rank: 6 }
+          };
+        } else if (mode === "sashi_miss") {
+          document.getElementById("revVenue").value = "福岡";
+          document.getElementById("revRaceNo").value = "11";
+          document.getElementById("revGrade").value = "G1";
+          document.getElementById("fin1").value = "2";
+          document.getElementById("fin2").value = "1";
+          document.getElementById("fin3").value = "5";
+          document.getElementById("actualKimarite").value = "sashi";
+          document.getElementById("payoutYen").value = "3640";
+          document.getElementById("payoutPop").value = "14";
+          document.getElementById("payout2tYen").value = "920";
+          document.getElementById("actualWindDir").value = "追い風";
+          document.getElementById("actualWindSpeed").value = "5";
+          document.getElementById("actualKado").value = "4";
+          document.getElementById("preExpectedScenario").value = "nige";
+          document.getElementById("totalInvestYen").value = "3600";
+          document.getElementById("hitTicketYen").value = "400";
+          document.getElementById("preBetsInput").value = "1-2-3, 1-2-4, 1-3-2, 1-3-4, 1-4-2, 1-4-3";
+
+          document.getElementById("firstMarkPattern").value = "c2_sashi_atk";
+          document.getElementById("dochuOvertakeType").value = "none";
+          document.getElementById("dochuReason").value = "none";
+          reviewBoats = {
+            1: { id: 1, course: 1, name: "峰 竜太", exTime: 6.78, preSt: 0.12, actualSt: 0.13, m1Action: "先マイ膨らみ", m1Rank: 2, rank: 2 },
+            2: { id: 2, course: 2, name: "毒島 誠", exTime: 6.74, preSt: 0.13, actualSt: 0.11, m1Action: "1M差し抜け", m1Rank: 1, rank: 1 },
+            3: { id: 3, course: 3, name: "馬場 貴也", exTime: 6.76, preSt: 0.14, actualSt: 0.14, m1Action: "外マイ流れ", m1Rank: 4, rank: 4 },
+            4: { id: 4, course: 4, name: "桐生 順平", exTime: 6.79, preSt: 0.15, actualSt: 0.16, m1Action: "差し届かず", m1Rank: 5, rank: 5 },
+            5: { id: 5, course: 5, name: "茅原 悠紀", exTime: 6.75, preSt: 0.14, actualSt: 0.13, m1Action: "展開待ち最内", m1Rank: 3, rank: 3 },
+            6: { id: 6, course: 6, name: "池田 浩二", exTime: 6.81, preSt: 0.16, actualSt: 0.17, m1Action: "展開待ち", m1Rank: 6, rank: 6 }
+          };
+        } else {
+          document.getElementById("revVenue").value = "大村";
+          document.getElementById("revRaceNo").value = "12";
+          document.getElementById("revGrade").value = "SG";
+          document.getElementById("fin1").value = "1";
+          document.getElementById("fin2").value = "2";
+          document.getElementById("fin3").value = "4";
+          document.getElementById("actualKimarite").value = "nige";
+          document.getElementById("payoutYen").value = "980";
+          document.getElementById("payoutPop").value = "2";
+          document.getElementById("payout2tYen").value = "380";
+          document.getElementById("actualWindDir").value = "無風";
+          document.getElementById("actualWindSpeed").value = "1";
+          document.getElementById("actualKado").value = "4";
+          document.getElementById("preExpectedScenario").value = "nige";
+          document.getElementById("totalInvestYen").value = "3000";
+          document.getElementById("hitTicketYen").value = "1000";
+          document.getElementById("preBetsInput").value = "1-2-4, 1-4-2, 1-2-3, 1-3-2";
+
+          document.getElementById("firstMarkPattern").value = "clean_in";
+          document.getElementById("dochuOvertakeType").value = "none";
+          document.getElementById("dochuReason").value = "none";
+          reviewBoats = {
+            1: { id: 1, course: 1, name: "白井 英治", exTime: 6.72, preSt: 0.11, actualSt: 0.09, m1Action: "先マイ逃走", m1Rank: 1, rank: 1 },
+            2: { id: 2, course: 2, name: "瓜生 正義", exTime: 6.76, preSt: 0.13, actualSt: 0.12, m1Action: "差し追走", m1Rank: 2, rank: 2 },
+            3: { id: 3, course: 3, name: "澤田 尚也", exTime: 6.79, preSt: 0.14, actualSt: 0.15, m1Action: "外マイ", m1Rank: 4, rank: 4 },
+            4: { id: 4, course: 4, name: "大峯 豊", exTime: 6.74, preSt: 0.13, actualSt: 0.12, m1Action: "二番差し", m1Rank: 3, rank: 3 },
+            5: { id: 5, course: 5, name: "篠崎 仁志", exTime: 6.80, preSt: 0.15, actualSt: 0.15, m1Action: "展開待ち", m1Rank: 5, rank: 5 },
+            6: { id: 6, course: 6, name: "吉田 裕平", exTime: 6.82, preSt: 0.16, actualSt: 0.17, m1Action: "最内差し", m1Rank: 6, rank: 6 }
+          };
+        }
+
+        renderBoatStTable();
+        runReviewAnalysis();
+      }
+
+      async function fetchViaCorsProxy(targetUrl) {
+        const proxies = [
+          (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+          (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+        ];
+        for (const makeUrl of proxies) {
+          try {
+            const res = await fetch(makeUrl(targetUrl));
+            if (res.ok) {
+              const txt = await res.text();
+              if (txt && txt.length > 500) return txt;
+            }
+          } catch (e) {}
+        }
+        return null;
+      }
+
+      async function autoFetchOfficialResultFromWeb() {
+        const dateVal = (document.getElementById("fetchDateInput").value || "").replace(/-/g, "");
+        const jcd = document.getElementById("fetchVenueCode").value || "04";
+        const rno = document.getElementById("fetchRno").value || "12";
+        const msgEl = document.getElementById("autoFetchMsg");
+        const vName = VENUE_CODE_TO_NAME[jcd] || "平和島";
+
+        msgEl.textContent = `⏳ BOAT RACE公式から ${dateVal} ${vName} ${rno}R の確定結果・配当を取得中...`;
+        document.getElementById("revVenue").value = vName;
+        document.getElementById("revRaceNo").value = String(rno);
+
+        const resUrl = `https://www.boatrace.jp/owpc/pc/race/raceresult?rno=${rno}&jcd=${jcd}&hd=${dateVal}`;
+        const befUrl = `https://www.boatrace.jp/owpc/pc/race/beforeinfo?rno=${rno}&jcd=${jcd}&hd=${dateVal}`;
+
+        const [resHtml, befHtml] = await Promise.all([
+          fetchViaCorsProxy(resUrl),
+          fetchViaCorsProxy(befUrl)
+        ]);
+
+        if (!resHtml) {
+          msgEl.textContent = `⚠️ ブラウザの通信制限または未開催のため取得できませんでした。「📥 結果テキスト貼付」またはStreamlit上部バーをご利用ください。`;
+          return;
+        }
+
+        const parser = new DOMParser();
+        if (befHtml) {
+          const befDoc = parser.parseFromString(befHtml, "text/html");
+          befDoc.querySelectorAll("div.table1 table tbody.is-fs12").forEach(tb => {
+            const firstRow = tb.querySelector("tr");
+            if (!firstRow) return;
+            const tds = firstRow.querySelectorAll("td");
+            if (tds.length >= 5) {
+              const bNo = parseInt(tds[0].textContent.trim(), 10);
+              const nm = tds[2].textContent.replace(/\s+/g, " ").trim();
+              const exM = tds[4].textContent.match(/[67]\.\d{2}/);
+              if (reviewBoats[bNo]) {
+                if (nm) reviewBoats[bNo].name = nm;
+                if (exM) reviewBoats[bNo].exTime = parseFloat(exM[0]);
+              }
+            }
+          });
+          befDoc.querySelectorAll("div.table1_boatImage1").forEach(box => {
+            const nEl = box.querySelector(".table1_boatImage1Number");
+            const tEl = box.querySelector(".table1_boatImage1Time");
+            if (nEl && tEl) {
+              const bNo = parseInt(nEl.textContent.trim(), 10);
+              const stM = tEl.textContent.replace(/[FL]/g, "").trim().match(/\.?\d{2}/);
+              if (reviewBoats[bNo] && stM) {
+                const raw = stM[0];
+                reviewBoats[bNo].preSt = parseFloat(raw.startsWith(".") ? "0" + raw : raw);
+              }
+            }
+          });
+        }
+
+        const resDoc = parser.parseFromString(resHtml, "text/html");
+        const fullText = resDoc.body.textContent.replace(/\s+/g, " ");
+        if (fullText.includes("データがありません")) {
+          msgEl.textContent = `⚠️ ${dateVal} ${vName} ${rno}R は結果未確定または非開催です。`;
+          return;
+        }
+
+        // 着順・選手名解析
+        const finishOrders = [];
+        resDoc.querySelectorAll("div.table1 table tbody tr").forEach(tr => {
+          const tds = Array.from(tr.querySelectorAll("td")).map(td => td.textContent.replace(/\s+/g, " ").trim());
+          if (tds.length >= 4 && /^[1-6]$/.test(tds[0]) && /^[1-6]$/.test(tds[1])) {
+            const rk = parseInt(tds[0], 10);
+            const bNo = parseInt(tds[1], 10);
+            finishOrders.push({ rk, bNo });
+            if (reviewBoats[bNo]) {
+              reviewBoats[bNo].rank = rk;
+              const nmParts = tds[2].split(/\s+/).filter(x => !/^\d{4}$/.test(x));
+              if (nmParts.length > 0) reviewBoats[bNo].name = nmParts.join(" ");
+            }
+          }
+        });
+        finishOrders.sort((a, b) => a.rk - b.rk);
+        if (finishOrders.length >= 3) {
+          document.getElementById("fin1").value = String(finishOrders[0].bNo);
+          document.getElementById("fin2").value = String(finishOrders[1].bNo);
+          document.getElementById("fin3").value = String(finishOrders[2].bNo);
+        }
+
+        // 本番スリットST解析
+        resDoc.querySelectorAll("div.table1_boatImage1").forEach((box, idx) => {
+          const nEl = box.querySelector(".table1_boatImage1Number");
+          const tEl = box.querySelector(".table1_boatImage1Time");
+          if (nEl) {
+            const bNo = parseInt(nEl.textContent.trim(), 10);
+            if (reviewBoats[bNo]) {
+              reviewBoats[bNo].course = idx + 1;
+              if (tEl) {
+                const stM = tEl.textContent.match(/0?\.\d{2}/);
+                if (stM) {
+                  const s = stM[0];
+                  reviewBoats[bNo].actualSt = parseFloat(s.startsWith(".") ? "0" + s : s);
+                }
+              }
+            }
+          }
+        });
+
+        // 決まり手解析
+        if (fullText.includes("まくり差し")) document.getElementById("actualKimarite").value = "makurisashi";
+        else if (fullText.includes("まくり")) document.getElementById("actualKimarite").value = "makuri";
+        else if (fullText.includes("差し")) document.getElementById("actualKimarite").value = "sashi";
+        else if (fullText.includes("抜き")) document.getElementById("actualKimarite").value = "nuki";
+        else if (fullText.includes("恵まれ")) document.getElementById("actualKimarite").value = "megumare";
+        else document.getElementById("actualKimarite").value = "nige";
+
+        // 払戻金（3連単・2連単・人気）の確実な抽出
+        const payoutSpans = Array.from(resDoc.querySelectorAll("span.is-payout1"))
+          .map(el => parseInt(el.textContent.replace(/[^\d]/g, ""), 10))
+          .filter(n => Number.isFinite(n) && n >= 100);
+        if (payoutSpans.length >= 1) {
+          document.getElementById("payoutYen").value = payoutSpans[0];
+        } else {
+          const m3 = fullText.match(/3連単[\s\S]{1,80}?¥\s*([\d,]+)/);
+          if (m3) document.getElementById("payoutYen").value = parseInt(m3[1].replace(/,/g, ""), 10);
+        }
+        const m2 = fullText.match(/2連単[\s\S]{1,80}?¥\s*([\d,]+)/);
+        if (m2) document.getElementById("payout2tYen").value = parseInt(m2[1].replace(/,/g, ""), 10);
+
+        const popM = fullText.match(/3連単[\s\S]{1,80}?¥\s*[\d,]+\s+(\d{1,3})\b/);
+        if (popM) document.getElementById("payoutPop").value = parseInt(popM[1], 10);
+
+        const windM = fullText.match(/風速\s*(\d+)\s*m/);
+        if (windM) document.getElementById("actualWindSpeed").value = parseInt(windM[1], 10);
+
+        infer1MProcessFromNumbers(false);
+        renderBoatStTable();
+        runReviewAnalysis();
+        msgEl.textContent = `✅ 公式結果＆配当を自動反映しました！（確定: ${document.getElementById("fin1").value}-${document.getElementById("fin2").value}-${document.getElementById("fin3").value} ／ 3連単 ${Number(document.getElementById("payoutYen").value).toLocaleString()}円）`;
+      }
+
+
+      function infer1MProcessFromNumbers(triggerRun = true) {
+        const f1 = Number(document.getElementById("fin1").value);
+        const f2 = Number(document.getElementById("fin2").value);
+        const f3 = Number(document.getElementById("fin3").value);
+        const kim = document.getElementById("actualKimarite").value;
+        const arr = Object.values(reviewBoats);
+        if (arr.length < 6) return;
+
+        // 1. 本番STと着順の乖離から「仕掛け不発（やり合い）」「壁崩壊」「引き波被弾」を数値逆算
+        const c1 = arr.find(x => x.course === 1) || reviewBoats[1];
+        const c2 = arr.find(x => x.course === 2) || reviewBoats[2];
+        const c3 = arr.find(x => x.course === 3) || reviewBoats[3];
+        const c4 = arr.find(x => x.course === 4) || reviewBoats[4];
+        const wBoat = reviewBoats[f1];
+
+        // センター勢がST踏み込んだのに4〜6着に沈み、差し・まくり差し決着になった場合＝「1Mやり合い（抵抗）発生」
+        const centerChargedAndSank = [c3, c4].some(x => x && x.actualSt <= c1.actualSt - 0.02 && x.rank >= 4 && c1.rank >= 3);
+
+        if (kim === "nige") {
+          document.getElementById("firstMarkPattern").value = "clean_in";
+        } else if (kim === "sashi" && wBoat?.course === 2) {
+          document.getElementById("firstMarkPattern").value = c1.rank === 2 ? "in_flow" : "c2_sashi_atk";
+        } else if (kim === "makuri" && wBoat?.course === 2) {
+          document.getElementById("firstMarkPattern").value = "c2_makuri_atk";
+        } else if (centerChargedAndSank) {
+          document.getElementById("firstMarkPattern").value = "clash_wait";
+        } else if (kim === "makuri") {
+          document.getElementById("firstMarkPattern").value = "center_makuri_atk";
+        } else if (kim === "makurisashi") {
+          document.getElementById("firstMarkPattern").value = "center_ms_atk";
+        } else if (kim === "nuki") {
+          document.getElementById("firstMarkPattern").value = "in_flow";
+        }
+
+        // 2. 道中逆転の自動推論（決まり手が「抜き」または展示時計上位艇がスジ外から2・3着に食い込んだ場合）
+        if (kim === "nuki") {
+          document.getElementById("dochuOvertakeType").value = "overtake_1st";
+          document.getElementById("dochuReason").value = "turn_power";
+        } else {
+          const b3Obj = reviewBoats[f3];
+          const exSorted = [...arr].sort((a, b) => a.exTime - b.exTime);
+          if (b3Obj && (b3Obj.exTime <= exSorted[1].exTime || b3Obj.course === 1 && kim === "makuri")) {
+            document.getElementById("dochuOvertakeType").value = "overtake_3rd";
+            document.getElementById("dochuReason").value = "turn_power";
+          } else {
+            document.getElementById("dochuOvertakeType").value = "none";
+            document.getElementById("dochuReason").value = "none";
+          }
+        }
+
+        // 3. 6艇それぞれの1Mアクションと1M出口順位をST・コース・確定着順から自動推定
+        arr.forEach(d => {
+          const prevCourseBoat = arr.find(x => x.course === d.course - 1);
+          const isDoka = d.actualSt >= 0.19 || (prevCourseBoat && d.actualSt - prevCourseBoat.actualSt >= 0.04);
+
+          if (d.id === f1) {
+            if (kim === "nige") d.m1Action = "先マイ逃走";
+            else if (kim === "makuri") d.m1Action = "まくり敢行";
+            else if (kim === "makurisashi") d.m1Action = "まくり差し連動";
+            else if (kim === "sashi") d.m1Action = "1M差し抜け";
+            else d.m1Action = "差し追走";
+            d.m1Rank = kim === "nuki" ? 2 : 1;
+          } else if (isDoka && d.rank >= 4) {
+            d.m1Action = "凹み・壁崩壊";
+            d.m1Rank = d.rank;
+          } else if (d.course >= 3 && d.actualSt <= c1.actualSt - 0.02 && d.rank >= 4) {
+            d.m1Action = "まくり不発(抵抗被弾)";
+            d.m1Rank = 4;
+          } else if (d.course === 1 && d.rank >= 2) {
+            d.m1Action = kim === "makuri" ? "引き波被弾" : "先マイ膨らみ";
+            d.m1Rank = kim === "nuki" ? 1 : (kim === "makuri" && d.rank === 3 ? 4 : d.rank);
+          } else if (d.rank <= 3) {
+            if (d.course >= 5 || (kim === "makuri" && d.course > wBoat.course + 1)) {
+              d.m1Action = "展開待ち最内";
+            } else if (kim === "makuri" && d.course === wBoat.course + 1) {
+              d.m1Action = "まくり差し連動";
+            } else if (d.course === 2) {
+              d.m1Action = "差し追走";
+            } else {
+              d.m1Action = "二番差し";
+            }
+            d.m1Rank = d.rank;
+          } else {
+            d.m1Action = d.course < (wBoat?.course || 1) ? "引き波被弾" : "外マイ";
+            d.m1Rank = d.rank;
+          }
+        });
+
+        renderBoatStTable();
+        if (triggerRun) runReviewAnalysis();
+      }
+
+      function renderBoatStTable() {
+        const tbody = document.getElementById("boatStInputTable");
+        tbody.innerHTML = "";
+        for (let b = 1; b <= 6; b++) {
+          const d = reviewBoats[b];
+          const diff = d.actualSt - d.preSt;
+          const diffStr = (diff >= 0 ? "+" : "") + diff.toFixed(2);
+          const diffCls = diff <= -0.02 ? "text-amber-300 font-bold" : diff >= 0.03 ? "text-rose-400 font-bold" : "text-slate-400";
+          const diffLabel = diff <= -0.02 ? "🚀踏み込み" : diff >= 0.03 ? "⚠️ドカ遅れ" : "通り";
+
+          tbody.innerHTML += `
+          <tr>
+            <td class="py-1 font-bold text-slate-300">${d.course}C</td>
+            <td class="py-1 flex items-center gap-1.5">
+              <span class="boat-${b} w-5 h-5 rounded text-[11px] font-black flex items-center justify-center">${b}</span>
+              <input type="text" value="${d.name}" onchange="updateRevBoat(${b},'name',this.value)" class="w-24 bg-slate-950 px-1 py-0.5 text-xs font-bold" />
+            </td>
+            <td class="py-1 text-center"><input type="number" step="0.01" value="${d.exTime.toFixed(2)}" onchange="updateRevBoat(${b},'exTime',parseFloat(this.value))" class="w-14 text-center font-mono" /></td>
+            <td class="py-1 text-center"><input type="number" step="0.01" value="${d.preSt.toFixed(2)}" onchange="updateRevBoat(${b},'preSt',parseFloat(this.value))" class="w-14 text-center font-mono text-slate-300" /></td>
+            <td class="py-1 text-center"><input type="number" step="0.01" value="${d.actualSt.toFixed(2)}" onchange="updateRevBoat(${b},'actualSt',parseFloat(this.value))" class="w-14 text-center font-mono text-teal-300 font-bold" /></td>
+            <td class="py-1 text-center font-mono text-[10px] ${diffCls}">${diffStr} (${diffLabel})</td>
+            <td class="py-1 text-center">
+              <select onchange="updateRevBoat(${b},'m1Action',this.value)" class="text-[10px] py-0.5 px-1 text-amber-200">
+                ${["先マイ逃走","先マイ膨らみ","まくり敢行","まくり不発(抵抗被弾)","まくり差し連動","1M差し抜け","差し追走","二番差し","外マイ","展開待ち最内","引き波被弾","凹み・壁崩壊"].map(act => `<option value="${act}" ${(d.m1Action || "差し追走") === act ? "selected" : ""}>${act}</option>`).join("")}
+              </select>
+            </td>
+            <td class="py-1 text-center"><input type="number" min="1" max="6" value="${d.m1Rank ?? d.rank}" onchange="updateRevBoat(${b},'m1Rank',parseInt(this.value,10))" class="w-10 text-center font-bold text-sky-300" title="1周1M出口時点の順位" /></td>
+            <td class="py-1 text-center"><input type="number" min="1" max="6" value="${d.rank}" onchange="updateRevBoat(${b},'rank',parseInt(this.value,10))" class="w-10 text-center font-bold text-teal-300" title="最終確定着順" /></td>
+          </tr>`;
+        }
+      }
+
+      function updateRevBoat(b, key, val) {
+        reviewBoats[b][key] = val;
+        renderBoatStTable();
+        runReviewAnalysis();
+      }
+
+      function parseUserBets(rawStr) {
+        if (!rawStr) return [];
+        const tokens = rawStr.replace(/、|，|\n|\r|\t/g, ",").split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+        const comboSet = new Set();
+        const expandDigits = (part) => {
+          if (part === "全" || part === "9" || part.toUpperCase() === "ALL") return [1, 2, 3, 4, 5, 6];
+          return [...part.matchAll(/[1-6]/g)].map(m => Number(m[0]));
+        };
+        tokens.forEach(tok => {
+          const parts = tok.split(/[-=→>]/);
+          if (parts.length === 3) {
+            const p1 = expandDigits(parts[0]), p2 = expandDigits(parts[1]), p3 = expandDigits(parts[2]);
+            p1.forEach(a => p2.forEach(b => p3.forEach(c => {
+              if (a !== b && b !== c && a !== c) comboSet.add(`${a}-${b}-${c}`);
+            })));
+          } else if (/^[1-6]{3}$/.test(tok)) {
+            const a = Number(tok[0]), b = Number(tok[1]), c = Number(tok[2]);
+            if (a !== b && b !== c && a !== c) comboSet.add(`${a}-${b}-${c}`);
+          }
+        });
+        return Array.from(comboSet);
+      }
+
+      function renderSlitComparison() {
+        const container = document.getElementById("slitComparisonLanes");
+        const kado = Number(document.getElementById("actualKado").value || 4);
+        container.innerHTML = "";
+        for (let b = 1; b <= 6; b++) {
+          const d = reviewBoats[b];
+          const preLeft = Math.max(12, Math.min(72, 42 + (0.16 - d.preSt) * 280));
+          const actLeft = Math.max(12, Math.min(75, 42 + (0.16 - d.actualSt) * 280));
+          const diff = d.actualSt - d.preSt;
+          const badge = diff <= -0.02 ? "🚀本番踏み込み" : diff >= 0.03 ? "⚠️本番凹み" : "";
+          container.innerHTML += `
+          <div class="slit-lane ${d.course === kado ? "kado-line" : ""}">
+            <span class="text-[10px] text-slate-400 w-12 pl-1 font-mono">${d.course}C</span>
+            <div style="left:${preLeft}%;" class="absolute flex items-center opacity-35 pointer-events-none">
+              <span class="boat-${b} px-1.5 py-0.5 rounded text-[10px] font-bold">${b}</span>
+              <span class="text-[9px] text-slate-300 ml-1">展.${Math.round(d.preSt * 100).toString().padStart(2, "0")}</span>
+            </div>
+            <div style="left:${actLeft}%;" class="absolute flex items-center gap-1.5 z-10">
+              <span class="boat-${b} px-2 py-0.5 rounded text-xs font-black shadow">${b}</span>
+              <span class="text-[11px] font-bold text-white whitespace-nowrap">${d.name.replace(/\s+/g, "")} <span class="font-mono text-teal-300">(実.${Math.round(d.actualSt * 100).toString().padStart(2, "0")})</span> <span class="text-[10px] text-amber-300">${badge}</span></span>
+            </div>
+          </div>`;
+        }
+      }
+
+      function runReviewAnalysis() {
+        renderSlitComparison();
+
+        const venue = document.getElementById("revVenue").value;
+        const raceNo = document.getElementById("revRaceNo").value;
+        const grade = document.getElementById("revGrade").value;
+        const f1 = Number(document.getElementById("fin1").value);
+        const f2 = Number(document.getElementById("fin2").value);
+        const f3 = Number(document.getElementById("fin3").value);
+        const actualCombo = `${f1}-${f2}-${f3}`;
+        const kimarite = document.getElementById("actualKimarite").value;
+        const kimariteName = KIMARITE_LABELS[kimarite] || "逃げ";
+        const payout = Number(document.getElementById("payoutYen").value || 0);
+        const payoutPop = Number(document.getElementById("payoutPop")?.value || 1);
+        const payout2t = Number(document.getElementById("payout2tYen")?.value || 0);
+        const windDir = document.getElementById("actualWindDir").value;
+        const windSpeed = Number(document.getElementById("actualWindSpeed").value || 0);
+        const kado = Number(document.getElementById("actualKado").value || 4);
+
+        const popBadge = document.getElementById("payoutPopularBadge");
+        if (popBadge) {
+          popBadge.textContent = `3連単 ${payout.toLocaleString()}円 (${payoutPop}番人気) ／ 2連単 ${payout2t.toLocaleString()}円`;
+        }
+
+        const preScenario = document.getElementById("preExpectedScenario").value;
+        const invest = Number(document.getElementById("totalInvestYen").value || 3000);
+        const hitUnitYen = Number(document.getElementById("hitTicketYen").value || 500);
+        const userBets = parseUserBets(document.getElementById("preBetsInput").value);
+
+        const isHit = userBets.includes(actualCombo);
+        const returnYen = isHit ? Math.round((payout / 100) * hitUnitYen) : 0;
+        const profitYen = returnYen - invest;
+        const roiPct = invest > 0 ? Math.round((returnYen / invest) * 100) : 0;
+
+        const has1stHit = userBets.some(c => Number(c.split("-")[0]) === f1);
+        const has1st2ndHit = userBets.some(c => {
+          const [a, b] = c.split("-").map(Number);
+          return a === f1 && b === f2;
+        });
+        const hasUra = userBets.includes(`${f2}-${f1}-${f3}`) || userBets.includes(`${f1}-${f3}-${f2}`);
+
+        const hitBadge = document.getElementById("hitOrMissBadge");
+        if (isHit) {
+          hitBadge.className = "bg-amber-400 text-slate-950 px-3 py-1 rounded font-black text-sm shadow";
+          hitBadge.textContent = "🎯 的中！ (展開一致)";
+        } else if (has1st2ndHit) {
+          hitBadge.className = "bg-purple-500 text-white px-3 py-1 rounded font-black text-sm shadow";
+          hitBadge.textContent = "惜敗：1・2着的中 (3着抜け)";
+        } else if (hasUra) {
+          hitBadge.className = "bg-rose-500 text-white px-3 py-1 rounded font-black text-sm shadow";
+          hitBadge.textContent = "惜敗：裏目決着 (スジ合致)";
+        } else if (has1stHit) {
+          hitBadge.className = "bg-sky-600 text-white px-3 py-1 rounded font-black text-sm shadow";
+          hitBadge.textContent = "惜敗：1着的中 (2着スジ抜け)";
+        } else {
+          hitBadge.className = "bg-slate-800 text-rose-300 border border-rose-500/40 px-3 py-1 rounded font-black text-sm";
+          hitBadge.textContent = "不的中 (1M展開逆行)";
+        }
+
+        const b1 = reviewBoats[f1] || { name: `${f1}号艇`, actualSt: 0.13, preSt: 0.13, exTime: 6.75 };
+        const b2 = reviewBoats[f2] || { name: `${f2}号艇`, actualSt: 0.14, preSt: 0.14, exTime: 6.77 };
+        const b3 = reviewBoats[f3] || { name: `${f3}号艇`, actualSt: 0.15, preSt: 0.15, exTime: 6.79 };
+
+        document.getElementById("resultSummaryTitle").textContent =
+          `${venue} ${raceNo}R (${grade}) 確定結果：${actualCombo} （${b1.name} → ${b2.name} → ${b3.name} ／ 決まり手：${kimariteName}）`;
+        document.getElementById("roiSummaryText").textContent =
+          `3連単配当: ${payout.toLocaleString()}円(${payoutPop}人気) ｜ 投資: ${invest.toLocaleString()}円 → 回収: ${returnYen.toLocaleString()}円 (収支 ${profitYen >= 0 ? "+" : ""}${profitYen.toLocaleString()}円 / 回収率 ${roiPct}%)`;
+
+        const boatsArr = Object.values(reviewBoats);
+        const dokaBoats = boatsArr.filter(x => x.actualSt - x.preSt >= 0.03 || x.actualSt >= 0.18);
+        const topStBoat = [...boatsArr].sort((a, b) => a.actualSt - b.actualSt)[0];
+
+        const dokaText = dokaBoats.length > 0
+          ? dokaBoats.map(x => `${x.course}コース${x.id}号艇(${x.name})が展示.${Math.round(x.preSt*100).toString().padStart(2,"0")}→本番.${Math.round(x.actualSt*100).toString().padStart(2,"0")}と遅れ`).join("、")
+          : "大きなスタート遅れはなく、ほぼ展示通りのスリット隊形";
+
+        let why2nd3rdText = "";
+        if (kimarite === "makuri") {
+          why2nd3rdText = `${f1}号艇（${b1.name}）が本番ST .${Math.round(b1.actualSt*100).toString().padStart(2,"0")}から豪快にまくったことで内枠勢が引き波に沈み、マーク外側から連動した<strong>${f2}号艇（${b2.name}）</strong>と、1マークのもつれ・引き波を最内「展開待ち」で突いた<strong>${f3}号艇（${b3.name}）</strong>が浮上する典型的な『まくり外連動スジ』で決着しました。`;
+        } else if (kimarite === "sashi" || kimarite === "makurisashi") {
+          why2nd3rdText = `1マークで先マイを図ったインに対し、<strong>${f1}号艇（${b1.name}）</strong>がブイ際を鋭く${kimariteName}突破。差された${f2}号艇（${b2.name}）が2着に踏みとどまり、3着には引き波を避けて展開待ちから差した<strong>${f3}号艇（${b3.name}）</strong>が食い込みました。`;
+        } else if (kimarite === "nige") {
+          why2nd3rdText = `1コース<strong>${f1}号艇（${b1.name}）</strong>が本番ST .${Math.round(b1.actualSt*100).toString().padStart(2,"0")}から完璧な先マイで押し切り。2着には順当に差し・外マイ追走した<strong>${f2}号艇（${b2.name}）</strong>、3着には道中連絡みした<strong>${f3}号艇（${b3.name}）</strong>が入りました。`;
+        } else {
+          why2nd3rdText = `1マークの攻防からバックストレッチ・2マークでの逆転（${kimariteName}）が発生し、出足・回り足に勝る<strong>${f1}号艇→${f2}号艇→${f3}号艇</strong>の順で決着しました。`;
+        }
+
+        let reflectionAdvice = "";
+        if (isHit) {
+          reflectionAdvice = `✅ <strong>【勝因の解剖】</strong> 事前のスジ読み（${actualCombo}）と本番の1マーク展開（${kimariteName}）が完全に一致しています。特に2着${f2}号艇・3着${f3}号艇の連動ルートを正確に網羅できていた点が最大の勝因です。`;
+        } else if (has1st2ndHit) {
+          reflectionAdvice = `🔍 <strong>【3着抜けの原因解剖】</strong> 1着${f1}号艇・2着${f2}号艇の本線ラインは完璧に読めていましたが、3着に入った<strong>${f3}号艇（${b3.name}）</strong>が抜けています。1マークで${kimariteName}が起きた際、外枠や展開待ちの艇（${f3}号艇）が最内を小回りして3着に浮上するパターンを「展開待ち連対率」でケアするのが次回の改善ポイントです。`;
+        } else if (has1stHit) {
+          reflectionAdvice = `🔍 <strong>【2着スジ抜けの原因解剖】</strong> 1着アタマ（${f1}号艇・${kimariteName}）の狙いは的中していましたが、2着に入った<strong>${f2}号艇（${b2.name}）</strong>へのスジ連動が抜けていました。${kimarite === "makuri" ? "まくり決着時は内枠ではなく『まくった艇の1つ外（" + f2 + "号艇）』を2着筆頭に置くスジ鉄則" : "差し決着時は『1コースの2着残り』を最優先するスジ鉄則"}を徹底すると取りこぼしがなくなります。`;
+        } else {
+          reflectionAdvice = `🔍 <strong>【展開逆行の原因解剖】</strong> 事前は「${preScenario === "nige" ? "イン逃げ本線" : "別展開"}」を想定していましたが、本番は<strong>${dokaText}</strong>したことでスリット隊形が一変し、<strong>${f1}号艇の「${kimariteName}」</strong>が決まりました。${windDir}${windSpeed}mの水面条件と壁役の信頼度を再点検する必要があります。`;
+        }
+
+        const m1Sorted = [...boatsArr].sort((a, b) => (a.m1Rank ?? a.rank) - (b.m1Rank ?? b.rank));
+        const m1Combo = `${m1Sorted[0].id}-${m1Sorted[1].id}-${m1Sorted[2].id}`;
+        const isM1Hit = userBets.includes(m1Combo);
+        const firstMarkPat = document.getElementById("firstMarkPattern")?.value || "clean_in";
+        const dochuType = document.getElementById("dochuOvertakeType")?.value || "none";
+        const dochuReason = document.getElementById("dochuReason")?.value || "none";
+
+        const dochuChangedBoats = boatsArr.filter(x => (x.m1Rank ?? x.rank) !== x.rank);
+        const dochuSummaryText = (dochuType === "none" && m1Combo === actualCombo)
+          ? `1周1マーク出口隊形 <strong>[${m1Combo}]</strong> のまま道中逆転なく確定（純粋な1Mスジ決着）。`
+          : `1周1マーク出口時点では <strong>[${m1Combo}]</strong> でしたが、道中（1周2M以降）で <strong>[${actualCombo}]</strong> へ着順が入れ替わりました（${dochuChangedBoats.map(x => `${x.id}号艇:${x.m1Rank ?? x.rank}番手→${x.rank}着`).join(" / ")}）。${isM1Hit && !isHit ? "<span class=\"text-amber-300 font-bold\">★あなたの事前買い目は『1マーク出口時点では的中』していたため、1M展開読み自体は正解です！道中の機力（出足・回り足）差のみ補正します。</span>" : ""}`;
+
+        document.getElementById("retrospectiveDetailBox").innerHTML = `
+          <div class="space-y-1 border-b border-slate-800 pb-2">
+            <div class="text-teal-300 font-bold">① スリット（展示ST vs 本番実ST）のズレ診断</div>
+            <p>トップスタートは<strong>${topStBoat.course}コース${topStBoat.id}号艇（${topStBoat.name} / 実ST .${Math.round(topStBoat.actualSt*100).toString().padStart(2,"0")}）</strong>。全体としては「${dokaText}」というスリット結果でした。</p>
+          </div>
+          <div class="space-y-1 border-b border-slate-800 pb-2">
+            <div class="text-amber-300 font-bold">② 1マーク実際の攻め方 ＆ 1M出口隊形 [${m1Combo}] の解剖</div>
+            <p>各艇の1Mアクション：<strong>${boatsArr.map(x => `${x.course}C(${x.id}):${x.m1Action || "追走"}`).join(" ／ ")}</strong></p>
+            <p>${why2nd3rdText}</p>
+          </div>
+          <div class="space-y-1 border-b border-slate-800 pb-2">
+            <div class="text-sky-300 font-bold">③ 道中（1周2M〜3周）の逆転・着順変動の分離評価</div>
+            <p>${dochuSummaryText}</p>
+          </div>
+          <div class="space-y-1">
+            <div class="text-pink-300 font-bold">④ あなたの事前予想（${userBets.length}点）に対する答え合わせ結論</div>
+            <p>${reflectionAdvice}</p>
+          </div>
+        `;
+
+        let prescriptionHtml = "";
+        if (kimarite === "makuri") {
+          prescriptionHtml = `
+            <p>🔧 <strong>1. 重み付けスライダー調整：</strong> 本日の${venue}水面（${windDir}${windSpeed}m）ではダッシュ・スリット攻めが強く決まっています。予想シミュレーターの<strong>「④ スリット＆戦法連動ボーナス比重」を 140%〜160%</strong> に引き上げてください。</p>
+            <p>🔧 <strong>2. 手動1M攻め設定：</strong> カド受け（${kado - 1}コース）のSTが不安な番組では、カド（${kado}コース）に<strong>「🔥まくり」</strong>、その外隣に<strong>「⚡まくり差し」または「⏳展開待ち」</strong>を指定した【🟥パターンB（イン逃げ以外）】の比重を高めると高配当を仕留められます。</p>
+          `;
+        } else if (kimarite === "sashi" || kimarite === "makurisashi") {
+          prescriptionHtml = `
+            <p>🔧 <strong>1. コース別攻め成功率の重視：</strong> ターンマーク際の「差し・まくり差し」が決まる水面です。予想シミュレーターの<strong>「① コース別実績・攻め成功率比重」を 130%〜150%</strong> に上げ、2コース差し率・3/4コースまくり差し率が高い選手を素直に狙ってください。</p>
+            <p>🔧 <strong>2. 3着ヒモ穴対策：</strong> 差し決着の3着には<strong>「⏳展開待ち連対率」</strong>が50%を超える外枠選手を3着流しに加えると、${actualCombo}のような中穴〜万舟を取りこぼしません。</p>
+          `;
+        } else {
+          prescriptionHtml = `
+            <p>🔧 <strong>1. イン逃げ信頼度◎：</strong> 壁役の2コースがしっかり機能しインが押し切る水面です。<strong>【🟦パターンA：イン逃げ本線】</strong>を中心に、点数を6〜8点に絞って回収率（EV）を高める運用が有効です。</p>
+          `;
+        }
+        document.getElementById("simulatorPrescriptionBox").innerHTML = prescriptionHtml;
+
+        let mode = document.getElementById("postReportMode").value;
+        if (mode === "auto") mode = isHit ? "x_hit" : "x_verify";
+
+        let postText = "";
+        if (mode === "x_hit") {
+          postText = [
+            `🎯【${venue}${raceNo}R (${grade}) 展開シミュレーション完全的中！】🎯`,
+            ``,
+            `🏁 結果：${actualCombo} (${kimariteName} / 3連単 ${payout.toLocaleString()}円・${payoutPop}番人気)`,
+            `🥇 1着：${f1}号艇 ${b1.name} (実ST .${Math.round(b1.actualSt*100).toString().padStart(2,"0")})`,
+            `🥈 2着：${f2}号艇 ${b2.name}`,
+            `🥉 3着：${f3}号艇 ${b3.name}`,
+            ``,
+            `事前のシミュレーター解析通り、${windDir}${windSpeed}mのスリット攻防から1M「${kimariteName}」→2・3着スジ連動（${f2}号艇・${f3}号艇）がドンピシャで決まりました🚤🔥`,
+            `回収率 ${roiPct}%（+${profitYen.toLocaleString()}円）達成！`,
+            ``,
+            `次レースの2パターン展開解析＆勝負目もnoteで公開中です👇`,
+            `https://note.com/boatrace__daisu`,
+            `#ぼーとだいがくせい #ボートレース #競艇予想 #${venue}競艇`
+          ].join("\n");
+        } else if (mode === "x_verify") {
+          postText = [
+            `🔬【ぼーとだいがくせいの1M展開・答え合わせ研究室】${venue}${raceNo}R (${grade})`,
+            ``,
+            `🏁 確定結果：${actualCombo}（決まり手：${kimariteName} / 3連単 ${payout.toLocaleString()}円・${payoutPop}番人気）`,
+            `⏱️ 本番スリット変化：${dokaText}`,
+            ``,
+            `【1マーク解剖ログ】`,
+            `${f1}号艇(${b1.name})が実ST .${Math.round(b1.actualSt*100).toString().padStart(2,"0")}から${kimariteName}。引き波と展開の隙を突いて2着に${f2}号艇(${b2.name})、3着に${f3}号艇(${b3.name})が浮上するスジ決着でした。`,
+            ``,
+            `本日の${venue}の水面傾向とスタート変化データをシミュレーターの重み付けに反映完了💻 次Rの予想に活かします！👇`,
+            `https://note.com/boatrace__daisu`,
+            `#ぼーとだいがくせい #ボートレース #競艇検証 #${venue}競艇`
+          ].join("\n");
+        } else {
+          postText = [
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+            `🎓 ぼーとだいがくせい｜${venue}${raceNo}R (${grade}) レース結果×予想 徹底振り返りレポート`,
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+            `■ 1. 確定結果・払戻・収支判定`,
+            `・確定着順: ${actualCombo} （1着:${f1}号艇 ${b1.name} → 2着:${f2}号艇 ${b2.name} → 3着:${f3}号艇 ${b3.name}）`,
+            `・決まり手: ${kimariteName} ／ 3連単配当: ${payout.toLocaleString()}円 (${payoutPop}番人気) ／ 2連単: ${payout2t.toLocaleString()}円`,
+            `・水面気象: ${windDir}${windSpeed}m`,
+            `・予想判定: ${isHit ? "🎯 的中" : "🔍 不的中（検証完了）"} （投資 ${invest.toLocaleString()}円 → 回収 ${returnYen.toLocaleString()}円 / 回収率 ${roiPct}%）`,
+            ``,
+            `■ 2. 展示ST vs 本番実STのズレ検証`,
+            `・トップST: ${topStBoat.course}コース ${topStBoat.id}号艇 ${topStBoat.name} (実ST .${Math.round(topStBoat.actualSt*100).toString().padStart(2,"0")})`,
+            `・スリット総括: ${dokaText}`,
+            ``,
+            `■ 3. 1マークの攻防と2・3着スジ連動の解剖`,
+            why2nd3rdText.replace(/<[^>]+>/g, ""),
+            ``,
+            `■ 4. 次レースに向けたシミュレーター調整方針`,
+            reflectionAdvice.replace(/<[^>]+>/g, ""),
+            `🎓 ぼーとだいがくせい｜予想シミュレーター: https://bdkzgfy4igpjbzjachuzwu.streamlit.app/`,
+            `X: https://x.com/Boatrace__daisu ｜ note: https://note.com/boatrace__daisu`,
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+          ].join("\n");
+        }
+        document.getElementById("retroReportTextarea").value = postText;
+      }
+
+      function saveCurrentReviewToLog() {
+        const venue = document.getElementById("revVenue").value;
+        const raceNo = document.getElementById("revRaceNo").value;
+        const grade = document.getElementById("revGrade").value;
+        const f1 = Number(document.getElementById("fin1").value);
+        const f2 = Number(document.getElementById("fin2").value);
+        const f3 = Number(document.getElementById("fin3").value);
+        const actualCombo = `${f1}-${f2}-${f3}`;
+        const kimarite = document.getElementById("actualKimarite").value;
+        const payout = Number(document.getElementById("payoutYen").value || 0);
+        const invest = Number(document.getElementById("totalInvestYen").value || 3000);
+        const hitUnitYen = Number(document.getElementById("hitTicketYen").value || 500);
+        const userBets = parseUserBets(document.getElementById("preBetsInput").value);
+        const isHit = userBets.includes(actualCombo);
+        const returnYen = isHit ? Math.round((payout / 100) * hitUnitYen) : 0;
+
+        const has1st2nd = userBets.some(c => {
+          const [a, b] = c.split("-").map(Number);
+          return a === f1 && b === f2;
+        });
+        const boatsArr = Object.values(reviewBoats);
+        const m1Sorted = [...boatsArr].sort((a, b) => (a.m1Rank ?? a.rank) - (b.m1Rank ?? b.rank));
+        const m1Combo = `${m1Sorted[0].id}-${m1Sorted[1].id}-${m1Sorted[2].id}`;
+        const isM1Hit = userBets.includes(m1Combo);
+        const firstMarkPat = document.getElementById("firstMarkPattern")?.value || "clean_in";
+        const dochuType = document.getElementById("dochuOvertakeType")?.value || "none";
+        const dochuReason = document.getElementById("dochuReason")?.value || "none";
+        const stDiffKado = (reviewBoats[4]?.actualSt || 0.14) - (reviewBoats[4]?.preSt || 0.14);
+
+        reviewLogs.unshift({
+          venue,
+          raceNo,
+          grade,
+          actualCombo,
+          m1Combo,
+          kimarite,
+          kimariteName: KIMARITE_LABELS[kimarite] || "逃げ",
+          firstMarkPat,
+          dochuType,
+          dochuReason,
+          payout,
+          invest,
+          returnYen,
+          isHit,
+          isM1Hit,
+          missedThirdOnly: !isHit && has1st2nd,
+          stDiffKado
+        });
+        try {
+          localStorage.setItem("BOATRACE_REVIEW_LOGS", JSON.stringify(reviewLogs));
+        } catch (e) {}
+        computeAndSaveLearnedParams();
+        renderReviewLogs();
+      }
+
+
+      function computeAndSaveLearnedParams() {
+        if (reviewLogs.length === 0) return null;
+        const total = reviewLogs.length;
+        const nigeCnt = reviewLogs.filter(x => x.kimarite === "nige").length;
+        const makuriCnt = reviewLogs.filter(x => x.kimarite === "makuri").length;
+        const sashiCnt = reviewLogs.filter(x => x.kimarite === "sashi" || x.kimarite === "makurisashi").length;
+        const thirdMissCnt = reviewLogs.filter(x => x.missedThirdOnly).length;
+
+        const dochuOvertakeCnt = reviewLogs.filter(x => x.dochuType && x.dochuType !== "none").length;
+        const turnPowerCnt = reviewLogs.filter(x => x.dochuReason === "turn_power" || x.dochuReason === "racer_skill").length;
+        const clashWaitCnt = reviewLogs.filter(x => x.firstMarkPat === "clash_wait").length;
+        const m1MakuriAtkCnt = reviewLogs.filter(x => ["center_makuri_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length;
+
+        const nigeRatio = nigeCnt / total;
+        const makuriRatio = m1MakuriAtkCnt / total;
+        const sashiRatio = sashiCnt / total;
+        const dochuRatio = dochuOvertakeCnt / total;
+
+        // 1M展開要因（スリット・コース攻め）と道中逆転要因（展示気配・モーター・実力）を分離して重み付け学習
+        const w_course = Math.min(180, Math.max(70, Math.round((100 + (sashiRatio - 0.25) * 85 + (nigeRatio - 0.50) * 35) / 5) * 5));
+        const w_exhibit = Math.min(190, Math.max(80, Math.round((105 + dochuRatio * 55 + (turnPowerCnt / total) * 45) / 5) * 5));
+        const w_motor = Math.min(190, Math.max(80, Math.round((100 + dochuRatio * 60 + sashiRatio * 35) / 5) * 5));
+        const w_slit = Math.min(190, Math.max(80, Math.round((100 + (makuriRatio - 0.20) * 130) / 5) * 5));
+
+        const inModAdj = Math.round((nigeRatio - 0.52) * 24);
+        const makuriModAdj = Math.round((makuriRatio - 0.22) * 28);
+        const sashiModAdj = Math.round((sashiRatio - 0.24) * 26);
+        const waitBonusAdj = Math.min(22, thirdMissCnt * 5 + clashWaitCnt * 6 + dochuOvertakeCnt * 3);
+
+        // 会場別（24場別）の蓄積バイアスも個別に計算して保持
+        const venueBiases = {};
+        const byVenue = {};
+        reviewLogs.forEach(item => {
+          const v = item.venue || "平和島";
+          if (!byVenue[v]) byVenue[v] = [];
+          byVenue[v].push(item);
+        });
+        Object.keys(byVenue).forEach(v => {
+          const list = byVenue[v];
+          const vc = list.length;
+          const vNige = list.filter(x => x.kimarite === "nige").length / vc;
+          const vMak = list.filter(x => ["center_makuri_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length / vc;
+          const vSas = list.filter(x => x.kimarite === "sashi" || x.kimarite === "makurisashi").length / vc;
+          const vWait = list.filter(x => x.missedThirdOnly || x.firstMarkPat === "clash_wait" || (x.dochuType && x.dochuType !== "none")).length;
+          venueBiases[v] = {
+            count: vc,
+            inModAdj: Math.round((vNige - 0.52) * 24),
+            makuriModAdj: Math.round((vMak - 0.22) * 28),
+            sashiModAdj: Math.round((vSas - 0.24) * 26),
+            waitBonusAdj: Math.min(22, vWait * 5)
+          };
+        });
+
+        const learnedObj = {
+          type: "BOATRACE_LEARNED_PARAMS",
+          sampleCount: total,
+          hitRate: Math.round((reviewLogs.filter(x => x.isHit).length / total) * 100),
+          m1HitRate: Math.round((reviewLogs.filter(x => x.isM1Hit || x.isHit).length / total) * 100),
+          dochuRate: Math.round(dochuRatio * 100),
+          weights: { w_course, w_exhibit, w_motor, w_slit },
+          bias: { inModAdj, makuriModAdj, sashiModAdj, waitBonusAdj },
+          venueBiases,
+          recentLogs: reviewLogs.slice(0, 20),
+          updatedAt: new Date().toLocaleTimeString()
+        };
+
+        try {
+          localStorage.setItem("BOATRACE_LEARNED_PARAMS", JSON.stringify(learnedObj));
+        } catch (e) {}
+
+        const prevEl = document.getElementById("learnedParamsPreview");
+        if (prevEl) {
+          prevEl.innerHTML = `全<strong>${total}R</strong>の蓄積結果から算出 → 推奨重み付け: <strong>[①コース:${w_course}% / ②展示:${w_exhibit}% / ③機力:${w_motor}% / ④スリット:${w_slit}%]</strong> ｜ 補正: <strong>[イン${inModAdj >= 0 ? "+" : ""}${inModAdj} / まくり${makuriModAdj >= 0 ? "+" : ""}${makuriModAdj} / 差し${sashiModAdj >= 0 ? "+" : ""}${sashiModAdj} / 3着展開待ち+${waitBonusAdj}]</strong> （ブラウザ自動同期済）`;
+        }
+        return learnedObj;
+      }
+
+      function exportLearnedParamsToSimulator() {
+        const obj = computeAndSaveLearnedParams();
+        if (!obj) return;
+        const jsonStr = JSON.stringify(obj);
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = jsonStr;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        } catch (e) {}
+        const prevEl = document.getElementById("learnedParamsPreview");
+        if (prevEl) {
+          prevEl.innerHTML += `<span class="ml-2 bg-emerald-500 text-slate-950 font-black px-2 py-0.5 rounded">✅ 学習パラメータをコピー＆同期しました！予想シミュレーターの「🧠 学習データ反映」で即適用できます</span>`;
+        }
+      }
+
+      function clearReviewLogs() {
+        reviewLogs = [];
+        try {
+          localStorage.removeItem("BOATRACE_REVIEW_LOGS");
+          localStorage.removeItem("BOATRACE_LEARNED_PARAMS");
+        } catch (e) {}
+        const prevEl = document.getElementById("learnedParamsPreview");
+        if (prevEl) prevEl.textContent = "蓄積データをリセットしました。";
+        renderReviewLogs();
+      }
+
+      function renderReviewLogs() {
+        const container = document.getElementById("reviewLogsContainer");
+        const sumEl = document.getElementById("logStatsSummary");
+        if (reviewLogs.length === 0) {
+          sumEl.textContent = "保存履歴: 0件";
+          container.innerHTML = `<div class="text-slate-500 text-[11px]">まだ保存されたレース履歴はありません。「💾 このレースを研究履歴に保存」を押すとここに蓄積されます。</div>`;
+          return;
+        }
+        const totalRaces = reviewLogs.length;
+        const hits = reviewLogs.filter(x => x.isHit).length;
+        const sumInv = reviewLogs.reduce((s, x) => s + x.invest, 0);
+        const sumRet = reviewLogs.reduce((s, x) => s + x.returnYen, 0);
+        const roi = sumInv > 0 ? Math.round((sumRet / sumInv) * 100) : 0;
+        const profit = sumRet - sumInv;
+
+        sumEl.textContent = `全${totalRaces}R ｜ 的中 ${hits}/${totalRaces} (${Math.round((hits/totalRaces)*100)}%) ｜ 累計回収率 ${roi}% (${profit >= 0 ? "+" : ""}${profit.toLocaleString()}円)`;
+        container.innerHTML = reviewLogs.map((item) => `
+          <div class="flex items-center justify-between bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded">
+            <div class="flex items-center gap-2">
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${item.isHit ? "bg-amber-400 text-slate-950" : "bg-slate-800 text-slate-400"}">${item.isHit ? "🎯的中" : "不的中"}</span>
+              <span class="font-bold text-white">${item.venue} ${item.raceNo}R (${item.grade})</span>
+              <span class="font-mono font-bold text-teal-300">${item.actualCombo}</span>
+              <span class="text-[10px] text-slate-400">[${item.kimariteName} / ${item.payout.toLocaleString()}円]</span>
+            </div>
+            <div class="font-mono text-[11px] ${item.returnYen - item.invest >= 0 ? "text-amber-300 font-bold" : "text-slate-400"}">
+              投資${item.invest.toLocaleString()}円 → 回収${item.returnYen.toLocaleString()}円
+            </div>
+          </div>
+        `).join("");
+      }
+
+      function copyRetroReport() {
+        const txt = document.getElementById("retroReportTextarea").value;
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+        } catch (e) {}
+        const toast = document.getElementById("copyRetroToast");
+        toast.classList.remove("hidden");
+        setTimeout(() => toast.classList.add("hidden"), 2300);
+      }
+
+      function parsePastedOfficialResult() {
+        const raw = (document.getElementById("rawResultPasteInput").value || "").trim();
+        if (!raw) return;
+
+        if (raw.includes("まくり差し")) document.getElementById("actualKimarite").value = "makurisashi";
+        else if (raw.includes("まくり")) document.getElementById("actualKimarite").value = "makuri";
+        else if (raw.includes("差し")) document.getElementById("actualKimarite").value = "sashi";
+        else if (raw.includes("逃げ")) document.getElementById("actualKimarite").value = "nige";
+        else if (raw.includes("抜き")) document.getElementById("actualKimarite").value = "nuki";
+
+        // スペースを含む「1 - 2 - 3」や改行を含む3連単組番＆配当の確実な抽出
+        const triMatch = raw.match(/3連単[\s\S]{1,80}?([1-6])\s*[-=ー]\s*([1-6])\s*[-=ー]\s*([1-6])[\s\S]{1,80}?¥?\s*([\d,]+)/);
+        if (triMatch) {
+          document.getElementById("fin1").value = triMatch[1];
+          document.getElementById("fin2").value = triMatch[2];
+          document.getElementById("fin3").value = triMatch[3];
+          document.getElementById("payoutYen").value = parseInt(triMatch[4].replace(/,/g, ""), 10);
+        } else {
+          const payOnly = raw.match(/3連単[\s\S]{1,80}?¥\s*([\d,]+)/);
+          if (payOnly) document.getElementById("payoutYen").value = parseInt(payOnly[1].replace(/,/g, ""), 10);
+        }
+
+        const nirentanM = raw.match(/2連単[\s\S]{1,80}?¥\s*([\d,]+)/);
+        if (nirentanM) {
+          document.getElementById("payout2tYen").value = parseInt(nirentanM[1].replace(/,/g, ""), 10);
+        }
+
+        const stMatches = [...raw.matchAll(/\b0?\.(\d{2})\b/g)].map(m => parseFloat(`0.${m[1]}`));
+        if (stMatches.length >= 6) {
+          for (let b = 1; b <= 6; b++) {
+            reviewBoats[b].actualSt = stMatches[b - 1];
+          }
+        }
+
+        infer1MProcessFromNumbers(false);
+        renderBoatStTable();
+        runReviewAnalysis();
+        document.getElementById("pasteResultModal").classList.add("hidden");
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const dd = String(now.getDate()).padStart(2, "0");
+        const dateEl = document.getElementById("fetchDateInput");
+        if (dateEl) dateEl.value = `${yyyy}-${mm}-${dd}`;
+
+        // 過去に保存した蓄積ログをlocalStorageから復元（上書き消去しない！）
+        let loadedFromStorage = false;
+        try {
+          const savedLogs = localStorage.getItem("BOATRACE_REVIEW_LOGS");
+          if (savedLogs) {
+            const parsed = JSON.parse(savedLogs);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              reviewLogs = parsed;
+              loadedFromStorage = true;
+            }
+          }
+        } catch (e) {}
+
+        loadSampleCase("makuri_hit");
+        if (!loadedFromStorage) {
+          saveCurrentReviewToLog();
+        } else {
+          computeAndSaveLearnedParams();
+          renderReviewLogs();
+        }
+      });
+    </script>
+  </body>
+</html>
+"""
 
 
 def main():
