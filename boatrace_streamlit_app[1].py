@@ -537,6 +537,220 @@ def fetch_race_data_from_official(hd: str, jcd: str, rno: int) -> dict:
 # ---------------------------------------------------------
 # 全バージョンの機能を統合した HTML/CSS/JS テンプレート
 # ---------------------------------------------------------
+
+def fetch_race_result_for_review(hd: str, jcd: str, rno: int) -> dict:
+    """BOAT RACE公式(raceresult + beforeinfo)からサーバー直結で確定結果・配当・本番ST・展示情報を取得"""
+    venue_map = dict(VENUE_LIST)
+    venue_label = venue_map.get(jcd, "04 平和島")
+    venue_name = venue_label.split(" ", 1)[1] if " " in venue_label else venue_label
+
+    res_url = f"https://www.boatrace.jp/owpc/pc/race/raceresult?rno={rno}&jcd={jcd}&hd={hd}"
+    bef_url = f"https://www.boatrace.jp/owpc/pc/race/beforeinfo?rno={rno}&jcd={jcd}&hd={hd}"
+
+    boats = {
+        str(b): {
+            "name": f"{b}号艇",
+            "course": b,
+            "preSt": 0.16,
+            "actualSt": 0.16,
+            "exTime": 6.80,
+            "rank": b,
+        }
+        for b in range(1, 7)
+    }
+
+    try:
+        session = make_official_session()
+        res_r = session.get(res_url, timeout=(5, 12))
+        res_r.encoding = "utf-8"
+        if res_r.status_code != 200:
+            return {"status": "error", "message": f"⚠️ 公式結果ページの取得に失敗しました (HTTP {res_r.status_code})"}
+    except Exception as e:
+        return {"status": "error", "message": f"⚠️ BOAT RACE公式への接続に失敗しました: {e}"}
+
+    soup_res = BeautifulSoup(res_r.text, "html.parser")
+    full_text = normalize_text(soup_res.get_text(" ", strip=True))
+    if "データがありません" in full_text or "レース中止" in full_text:
+        return {"status": "error", "message": f"⚠️ {hd} {venue_name} {rno}R は結果未確定・中止または非開催です。"}
+
+    # 直前情報(beforeinfo)から展示タイム・展示ST・選手名を取得
+    try:
+        res_b = session.get(bef_url, timeout=(4, 10))
+        res_b.encoding = "utf-8"
+        if res_b.status_code == 200:
+            soup_bef = BeautifulSoup(res_b.text, "html.parser")
+            for tb in soup_bef.select("div.table1 table tbody.is-fs12"):
+                tr = tb.select_one("tr")
+                if not tr:
+                    continue
+                tds = tr.select("td")
+                if len(tds) >= 5:
+                    b_txt = normalize_text(tds[0].get_text())
+                    if re.fullmatch(r"[1-6]", b_txt):
+                        nm = re.sub(r"\s+", " ", normalize_text(tds[2].get_text(" ", strip=True)))
+                        ex_m = re.search(r"[67]\.\d{2}", normalize_text(tds[4].get_text()))
+                        if nm:
+                            boats[b_txt]["name"] = nm
+                        if ex_m:
+                            boats[b_txt]["exTime"] = float(ex_m.group(0))
+            for box in soup_bef.select("div.table1_boatImage1"):
+                n_el = box.select_one(".table1_boatImage1Number")
+                t_el = box.select_one(".table1_boatImage1Time")
+                if n_el and t_el:
+                    b_txt = normalize_text(n_el.get_text())
+                    if b_txt in boats:
+                        raw_st = re.sub(r"[FL]", "", normalize_text(t_el.get_text()))
+                        st_m = re.search(r"0?\.\d{2}", raw_st)
+                        if st_m:
+                            s_val = st_m.group(0)
+                            boats[b_txt]["preSt"] = float("0" + s_val if s_val.startswith(".") else s_val)
+    except Exception:
+        pass
+
+    # 1. 着順・選手名解析 (NFKC正規化で全角数字「１〜６」にも完全対応)
+    finish_orders = []
+    seen_boats = set()
+    for tr in soup_res.select("div.table1 table tbody tr"):
+        tds = [normalize_text(td.get_text(" ", strip=True)) for td in tr.select("td")]
+        if len(tds) >= 3 and re.fullmatch(r"[1-6]", tds[1]):
+            b_str = tds[1]
+            rk_str = tds[0]
+            if re.fullmatch(r"[1-6]", rk_str):
+                rk = int(rk_str)
+                if b_str not in seen_boats:
+                    seen_boats.add(b_str)
+                    finish_orders.append((rk, int(b_str)))
+                    boats[b_str]["rank"] = rk
+                    nm_parts = [p for p in tds[2].split() if not re.fullmatch(r"\d{4}", p)]
+                    if nm_parts:
+                        boats[b_str]["name"] = " ".join(nm_parts)
+            elif rk_str in ("F", "L", "S", "K", "転", "落", "沈", "不", "失", "妨") and b_str not in seen_boats:
+                seen_boats.add(b_str)
+                boats[b_str]["rank"] = 6
+                nm_parts = [p for p in tds[2].split() if not re.fullmatch(r"\d{4}", p)]
+                if nm_parts:
+                    boats[b_str]["name"] = " ".join(nm_parts)
+
+    finish_orders.sort(key=lambda x: x[0])
+    finish = [b for _, b in finish_orders[:3]]
+    if len(finish) < 3:
+        return {"status": "error", "message": f"⚠️ {hd} {venue_name} {rno}R の着順データが見つかりませんでした（未確定の可能性があります）。"}
+
+    # 2. 本番進入コース・本番ST解析
+    for idx, box in enumerate(soup_res.select("div.table1_boatImage1")):
+        n_el = box.select_one(".table1_boatImage1Number")
+        t_el = box.select_one(".table1_boatImage1Time")
+        if n_el:
+            b_txt = normalize_text(n_el.get_text())
+            if b_txt in boats:
+                boats[b_txt]["course"] = idx + 1
+                if t_el:
+                    raw_st = re.sub(r"[FL]", "", normalize_text(t_el.get_text()))
+                    st_m = re.search(r"0?\.\d{2}", raw_st)
+                    if st_m:
+                        s_val = st_m.group(0)
+                        boats[b_txt]["actualSt"] = float("0" + s_val if s_val.startswith(".") else s_val)
+
+    # 3. 決まり手解析（決まり手テーブル優先、なければ全文フォールバック）
+    kimarite_text = ""
+    for tbl in soup_res.select("div.table1 table"):
+        th_txt = normalize_text(tbl.get_text(" ", strip=True))
+        if "決まり手" in th_txt:
+            td_el = tbl.select_one("tbody td")
+            if td_el:
+                kimarite_text = normalize_text(td_el.get_text(" ", strip=True))
+                break
+    k_src = kimarite_text or full_text
+    if "まくり差し" in k_src:
+        kimarite = "makurisashi"
+    elif "まくり" in k_src:
+        kimarite = "makuri"
+    elif "差し" in k_src:
+        kimarite = "sashi"
+    elif "抜き" in k_src:
+        kimarite = "nuki"
+    elif "恵まれ" in k_src:
+        kimarite = "megumare"
+    else:
+        kimarite = "nige"
+
+    # 4. 払戻金（3連単・2連単・人気）解析
+    payout_3t = 0
+    payout_2t = 0
+    payout_pop = 0
+
+    for tb in soup_res.select("div.table1 table tbody"):
+        tb_txt = normalize_text(tb.get_text(" ", strip=True))
+        if tb_txt.startswith("3連単"):
+            p_el = tb.select_one("span.is-payout1")
+            if p_el:
+                digits = re.sub(r"[^\d]", "", p_el.get_text())
+                if digits:
+                    payout_3t = int(digits)
+            # 人気順（最初のtrの末尾td）
+            first_tr = tb.select_one("tr")
+            if first_tr:
+                tds_p = [normalize_text(td.get_text(" ", strip=True)) for td in first_tr.select("td")]
+                for cell in reversed(tds_p):
+                    if re.fullmatch(r"\d{1,3}", cell):
+                        payout_pop = int(cell)
+                        break
+        elif tb_txt.startswith("2連単"):
+            p_el = tb.select_one("span.is-payout1")
+            if p_el:
+                digits = re.sub(r"[^\d]", "", p_el.get_text())
+                if digits:
+                    payout_2t = int(digits)
+
+    if payout_3t == 0:
+        pay_spans = [
+            int(re.sub(r"[^\d]", "", sp.get_text()))
+            for sp in soup_res.select("span.is-payout1")
+            if re.sub(r"[^\d]", "", sp.get_text())
+        ]
+        if pay_spans:
+            payout_3t = pay_spans[0]
+    if payout_2t == 0:
+        m2 = re.search(r"2連単[\s\S]{1,80}?¥\s*([\d,]+)", full_text)
+        if m2:
+            payout_2t = int(m2.group(1).replace(",", ""))
+    if payout_pop == 0:
+        pop_m = re.search(r"3連単[\s\S]{1,80}?¥\s*[\d,]+\s+(\d{1,3})\b", full_text)
+        if pop_m:
+            payout_pop = int(pop_m.group(1))
+
+    # 5. 風速解析
+    wind_speed = None
+    wind_el = soup_res.select_one(".weather1_bodyUnit.is-wind .weather1_bodyUnitLabelData")
+    if wind_el:
+        wm = re.search(r"(\d+)", normalize_text(wind_el.get_text()))
+        if wm:
+            wind_speed = int(wm.group(1))
+    if wind_speed is None:
+        wm = re.search(r"風速\s*(\d+)\s*m", full_text)
+        if wm:
+            wind_speed = int(wm.group(1))
+
+    date_iso = f"{hd[:4]}-{hd[4:6]}-{hd[6:8]}" if len(hd) == 8 else hd
+    return {
+        "status": "ok",
+        "meta": {
+            "hd": hd,
+            "dateIso": date_iso,
+            "jcd": jcd,
+            "venueName": venue_name,
+            "rno": rno,
+        },
+        "finish": finish,
+        "kimarite": kimarite,
+        "payout3t": payout_3t,
+        "payout2t": payout_2t,
+        "payoutPop": payout_pop,
+        "windSpeed": wind_speed,
+        "boats": boats,
+    }
+
+
 ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
 <html lang="ja">
   <head>
@@ -4494,7 +4708,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
             🔄 公式から着順・配当・実STを自動取得
           </button>
         </div>
-        <span id="autoFetchMsg" class="text-[11px] font-bold text-amber-300">💡 開催日・場・Rを選んで自動取得を押すと、3連単/2連単配当・人気・決まり手・実STが自動入力されます</span>
+        <span id="autoFetchMsg" class="text-[11px] font-bold text-amber-300">💡 Streamlit上部の「🏁 公式結果・配当・実ST 自動取得」ボタン（サーバー直結・確実）または下のボタンで自動入力されます</span>
       </section>
 
       <!-- 公式結果テキストコピペ取込ボックス -->
@@ -4904,16 +5118,29 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
 
       async function fetchViaCorsProxy(targetUrl) {
         const proxies = [
-          (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-          (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+          async (u) => {
+            const r = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(u)}`, { signal: AbortSignal.timeout(7000) });
+            return r.ok ? await r.text() : null;
+          },
+          async (u) => {
+            const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(u)}`, { signal: AbortSignal.timeout(7000) });
+            if (!r.ok) return null;
+            const j = await r.json();
+            return j && j.contents ? j.contents : null;
+          },
+          async (u) => {
+            const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`, { signal: AbortSignal.timeout(7000) });
+            return r.ok ? await r.text() : null;
+          },
+          async (u) => {
+            const r = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`, { signal: AbortSignal.timeout(7000) });
+            return r.ok ? await r.text() : null;
+          }
         ];
-        for (const makeUrl of proxies) {
+        for (const fn of proxies) {
           try {
-            const res = await fetch(makeUrl(targetUrl));
-            if (res.ok) {
-              const txt = await res.text();
-              if (txt && txt.length > 500) return txt;
-            }
+            const txt = await fn(targetUrl);
+            if (txt && txt.length > 500) return txt;
           } catch (e) {}
         }
         return null;
@@ -4939,7 +5166,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         ]);
 
         if (!resHtml) {
-          msgEl.textContent = `⚠️ ブラウザの通信制限または未開催のため取得できませんでした。「📥 結果テキスト貼付」またはStreamlit上部バーをご利用ください。`;
+          msgEl.textContent = `⚠️ ブラウザ経由の取得がブロックされました。上のStreamlitバーの「🏁 公式結果・配当・実ST 自動取得」ボタン（サーバー直結）を押すと確実に取得できます！`;
           return;
         }
 
@@ -4985,9 +5212,10 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         const finishOrders = [];
         resDoc.querySelectorAll("div.table1 table tbody tr").forEach(tr => {
           const tds = Array.from(tr.querySelectorAll("td")).map(td => td.textContent.replace(/\s+/g, " ").trim());
-          if (tds.length >= 4 && /^[1-6]$/.test(tds[0]) && /^[1-6]$/.test(tds[1])) {
-            const rk = parseInt(tds[0], 10);
-            const bNo = parseInt(tds[1], 10);
+          const td0 = tds[0] ? tds[0].normalize("NFKC") : ""; const td1 = tds[1] ? tds[1].normalize("NFKC") : "";
+          if (tds.length >= 4 && /^[1-6]$/.test(td0) && /^[1-6]$/.test(td1)) {
+            const rk = parseInt(td0, 10);
+            const bNo = parseInt(td1, 10);
             finishOrders.push({ rk, bNo });
             if (reviewBoats[bNo]) {
               reviewBoats[bNo].rank = rk;
@@ -5688,6 +5916,79 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         document.getElementById("pasteResultModal").classList.add("hidden");
       }
 
+      const INJECTED_REVIEW_DATA = null; // __INJECTED_REVIEW_DATA_MARKER__
+
+      function applyServerReviewData(data) {
+        if (!data || data.status !== "ok") return false;
+        const meta = data.meta || {};
+        if (meta.dateIso) {
+          const dEl = document.getElementById("fetchDateInput");
+          if (dEl) dEl.value = meta.dateIso;
+        }
+        if (meta.jcd) {
+          const vSel = document.getElementById("fetchVenueCode");
+          if (vSel) vSel.value = meta.jcd;
+        }
+        if (meta.rno) {
+          const rSel = document.getElementById("fetchRno");
+          if (rSel) rSel.value = String(meta.rno);
+          const revR = document.getElementById("revRaceNo");
+          if (revR) revR.value = String(meta.rno);
+        }
+        if (meta.venueName) {
+          const revV = document.getElementById("revVenue");
+          if (revV) revV.value = meta.venueName;
+        }
+
+        if (data.boats) {
+          for (let b = 1; b <= 6; b++) {
+            const src = data.boats[String(b)] || data.boats[b];
+            if (src && reviewBoats[b]) {
+              if (src.name) reviewBoats[b].name = src.name;
+              if (Number.isFinite(Number(src.course))) reviewBoats[b].course = Number(src.course);
+              if (Number.isFinite(Number(src.preSt))) reviewBoats[b].preSt = Number(src.preSt);
+              if (Number.isFinite(Number(src.actualSt))) reviewBoats[b].actualSt = Number(src.actualSt);
+              if (Number.isFinite(Number(src.exTime))) reviewBoats[b].exTime = Number(src.exTime);
+              if (Number.isFinite(Number(src.rank))) reviewBoats[b].rank = Number(src.rank);
+            }
+          }
+        }
+
+        if (Array.isArray(data.finish) && data.finish.length >= 3) {
+          document.getElementById("fin1").value = String(data.finish[0]);
+          document.getElementById("fin2").value = String(data.finish[1]);
+          document.getElementById("fin3").value = String(data.finish[2]);
+        }
+        if (data.kimarite) {
+          const kEl = document.getElementById("actualKimarite");
+          if (kEl) kEl.value = data.kimarite;
+        }
+        if (Number.isFinite(Number(data.payout3t)) && Number(data.payout3t) > 0) {
+          document.getElementById("payoutYen").value = Number(data.payout3t);
+        }
+        if (Number.isFinite(Number(data.payout2t)) && Number(data.payout2t) > 0) {
+          document.getElementById("payout2tYen").value = Number(data.payout2t);
+        }
+        if (Number.isFinite(Number(data.payoutPop)) && Number(data.payoutPop) > 0) {
+          document.getElementById("payoutPop").value = Number(data.payoutPop);
+        }
+        if (Number.isFinite(Number(data.windSpeed))) {
+          document.getElementById("actualWindSpeed").value = Number(data.windSpeed);
+        }
+
+        infer1MProcessFromNumbers(false);
+        renderBoatStTable();
+        runReviewAnalysis();
+
+        const msgEl = document.getElementById("autoFetchMsg");
+        if (msgEl) {
+          const fStr = Array.isArray(data.finish) ? data.finish.slice(0, 3).join("-") : "";
+          const pStr = Number(document.getElementById("payoutYen").value || 0).toLocaleString();
+          msgEl.textContent = `✅ サーバー直結で公式結果を取得済【${meta.hd || ""} ${meta.venueName || ""} ${meta.rno || ""}R】（確定: ${fStr} ／ 3連単 ${pStr}円）`;
+        }
+        return true;
+      }
+
       window.addEventListener("DOMContentLoaded", () => {
         const now = new Date();
         const yyyy = now.getFullYear();
@@ -5710,6 +6011,10 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         } catch (e) {}
 
         loadSampleCase("makuri_hit");
+        if (INJECTED_REVIEW_DATA && INJECTED_REVIEW_DATA.status === "ok") {
+          applyServerReviewData(INJECTED_REVIEW_DATA);
+        }
+
         if (!loadedFromStorage) {
           saveCurrentReviewToLog();
         } else {
@@ -5721,7 +6026,6 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
   </body>
 </html>
 """
-
 
 def main():
     st.set_page_config(page_title="BOAT RACE 展開シミュレーター PHASE 2 PRO Complete", page_icon="🚤", layout="wide")
@@ -5738,7 +6042,12 @@ def main():
     if "server_race_data" not in st.session_state:
         st.session_state["server_race_data"] = None
         st.session_state["status_banner"] = (
-            "💡 上のバーで日付・レース場・Rを選んで「🔄 公式データ自動取得」を押すと、出走表・直前情報・コース別攻め成功率・レースグレード(G1以上判定)が自動反映されます。"
+            "💡 上のバーで日付・レース場・Rを選んで「🔄 公式データ一括取得」を押すと、出走表・直前情報・コース別攻め成功率・レースグレード(G1以上判定)が自動反映されます。"
+        )
+    if "server_review_data" not in st.session_state:
+        st.session_state["server_review_data"] = None
+        st.session_state["review_status_banner"] = (
+            "💡 日付・レース場・Rを選んで「🏁 公式結果・配当・実ST 自動取得」を押すと、サーバー直結で確定着順・3連単/2連単配当・人気・決まり手・本番STが自動反映されます。"
         )
 
     c_mode, c_date, c_venue, c_rno, c_btn, c_odds = st.columns([1.6, 0.95, 1.35, 0.7, 1.5, 1.1])
@@ -5757,44 +6066,76 @@ def main():
         jcd_str = selected_venue[0]
     with c_rno:
         rno_int = st.selectbox("レース", list(range(1, 13)), index=11, format_func=lambda x: f"{x}R")
-    with c_btn:
-        st.write("")
-        if st.button("🔄 公式データ一括取得 (出走表＋展示＋オッズ)", type="primary", use_container_width=True):
-            with st.spinner(f"BOAT RACE公式から {hd_str} {selected_venue[1]} {rno_int}R を取得中..."):
-                res_data = fetch_race_data_from_official(hd_str, jcd_str, rno_int)
-                if res_data.get("status") == "ok":
-                    st.session_state["server_race_data"] = res_data
-                    names = " / ".join([f"{k}号艇:{v['name']}" for k, v in res_data["boats"].items()])
-                    g_str = res_data.get("meta", {}).get("raceGrade", "ippan")
-                    warns = " | ".join(res_data.get("warnings", []))
-                    st.session_state["status_banner"] = (
-                        f"✅ 取得成功【{hd_str} {selected_venue[1]} {rno_int}R ({g_str})】：{names} {warns}"
-                    )
-                else:
-                    st.error(res_data.get("message", "取得エラー"))
 
-    with c_odds:
-        st.write("")
-        if st.button("💹 最新オッズ更新", use_container_width=True):
-            with st.spinner(f"{selected_venue[1]} {rno_int}R の最新3連単オッズを更新中..."):
-                if not st.session_state.get("server_race_data"):
-                    st.session_state["server_race_data"] = fetch_race_data_from_official(hd_str, jcd_str, rno_int)
-                else:
-                    odds_bundle = fetch_latest_odds_only(hd_str, jcd_str, rno_int)
-                    st.session_state["server_race_data"]["odds3t"] = odds_bundle.get("odds3t", {})
-                    if odds_bundle.get("settledResult"):
-                        st.session_state["server_race_data"]["settledResult"] = odds_bundle["settledResult"]
-                cnt_o = len((st.session_state["server_race_data"] or {}).get("odds3t", {}))
-                st.session_state["status_banner"] = (
-                    f"💹 最新オッズ更新完了【{hd_str} {selected_venue[1]} {rno_int}R】：3連単 {cnt_o}通り反映済"
+    if app_mode == "🔬 結果振り返りサイト":
+        with c_btn:
+            st.write("")
+            if st.button("🏁 公式結果・配当・実ST 自動取得", type="primary", use_container_width=True):
+                with st.spinner(f"BOAT RACE公式から {hd_str} {selected_venue[1]} {rno_int}R の確定結果を取得中..."):
+                    rev_res = fetch_race_result_for_review(hd_str, jcd_str, rno_int)
+                    if rev_res.get("status") == "ok":
+                        st.session_state["server_review_data"] = rev_res
+                        f_str = "-".join(str(x) for x in rev_res.get("finish", []))
+                        p3 = rev_res.get("payout3t", 0)
+                        p2 = rev_res.get("payout2t", 0)
+                        st.session_state["review_status_banner"] = (
+                            f"✅ 結果取得成功【{hd_str} {selected_venue[1]} {rno_int}R】：確定 {f_str} ／ 3連単 ¥{p3:,} ／ 2連単 ¥{p2:,}"
+                        )
+                    else:
+                        st.error(rev_res.get("message", "結果取得エラー"))
+        with c_odds:
+            st.write("")
+            if st.button("🧹 結果データリセット", use_container_width=True):
+                st.session_state["server_review_data"] = None
+                st.session_state["review_status_banner"] = (
+                    "💡 結果データをリセットしました。上のバーから日付・場・Rを選んで「🏁 公式結果・配当・実ST 自動取得」を押してください。"
                 )
+    else:
+        with c_btn:
+            st.write("")
+            if st.button("🔄 公式データ一括取得 (出走表＋展示＋オッズ)", type="primary", use_container_width=True):
+                with st.spinner(f"BOAT RACE公式から {hd_str} {selected_venue[1]} {rno_int}R を取得中..."):
+                    res_data = fetch_race_data_from_official(hd_str, jcd_str, rno_int)
+                    if res_data.get("status") == "ok":
+                        st.session_state["server_race_data"] = res_data
+                        names = " / ".join([f"{k}号艇:{v['name']}" for k, v in res_data["boats"].items()])
+                        g_str = res_data.get("meta", {}).get("raceGrade", "ippan")
+                        warns = " | ".join(res_data.get("warnings", []))
+                        st.session_state["status_banner"] = (
+                            f"✅ 取得成功【{hd_str} {selected_venue[1]} {rno_int}R ({g_str})】：{names} {warns}"
+                        )
+                    else:
+                        st.error(res_data.get("message", "取得エラー"))
+
+        with c_odds:
+            st.write("")
+            if st.button("💹 最新オッズ更新", use_container_width=True):
+                with st.spinner(f"{selected_venue[1]} {rno_int}R の最新3連単オッズを更新中..."):
+                    if not st.session_state.get("server_race_data"):
+                        st.session_state["server_race_data"] = fetch_race_data_from_official(hd_str, jcd_str, rno_int)
+                    else:
+                        odds_bundle = fetch_latest_odds_only(hd_str, jcd_str, rno_int)
+                        st.session_state["server_race_data"]["odds3t"] = odds_bundle.get("odds3t", {})
+                        if odds_bundle.get("settledResult"):
+                            st.session_state["server_race_data"]["settledResult"] = odds_bundle["settledResult"]
+                    cnt_o = len((st.session_state["server_race_data"] or {}).get("odds3t", {}))
+                    st.session_state["status_banner"] = (
+                        f"💹 最新オッズ更新完了【{hd_str} {selected_venue[1]} {rno_int}R】：3連単 {cnt_o}通り反映済"
+                    )
 
     active_venues = get_active_venues_for_date(hd_str)
     active_info = f" ｜ 📍 {hd_str} 開催場: {', '.join(active_venues)}" if active_venues else ""
-    st.caption(st.session_state.get("status_banner", "") + active_info)
+    banner_key = "review_status_banner" if app_mode == "🔬 結果振り返りサイト" else "status_banner"
+    st.caption(st.session_state.get(banner_key, "") + active_info)
 
     if app_mode == "🔬 結果振り返りサイト":
-        components.html(EMBEDDED_REVIEWER_HTML, height=1750, scrolling=True)
+        rev_payload = json.dumps(st.session_state["server_review_data"], ensure_ascii=False)
+        rendered_reviewer = EMBEDDED_REVIEWER_HTML.replace(
+            "null; // __INJECTED_REVIEW_DATA_MARKER__",
+            rev_payload + ";",
+            1,
+        )
+        components.html(rendered_reviewer, height=1750, scrolling=True)
     else:
         json_payload = json.dumps(st.session_state["server_race_data"], ensure_ascii=False)
         rendered_html = ULTIMATE_HTML_TEMPLATE.replace("__INJECTED_SERVER_DATA__", json_payload)
