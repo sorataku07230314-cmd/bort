@@ -731,6 +731,9 @@ def fetch_race_result_for_review(hd: str, jcd: str, rno: int) -> dict:
         if wm:
             wind_speed = int(wm.group(1))
 
+    race_grade_code, race_title = detect_race_grade_from_soup(soup_res)
+    grade_label = "一般" if race_grade_code == "ippan" else race_grade_code
+    series_name = race_title if race_title else f"{hd[:4]}/{hd[4:6]} {venue_name}節"
     date_iso = f"{hd[:4]}-{hd[4:6]}-{hd[6:8]}" if len(hd) == 8 else hd
     return {
         "status": "ok",
@@ -740,6 +743,8 @@ def fetch_race_result_for_review(hd: str, jcd: str, rno: int) -> dict:
             "jcd": jcd,
             "venueName": venue_name,
             "rno": rno,
+            "grade": grade_label,
+            "seriesName": series_name,
         },
         "finish": finish,
         "kimarite": kimarite,
@@ -860,6 +865,21 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
             </button>
           </div>
         </div>
+        <!-- 🏆 3層（節ごと・レース場ごと・全体）適用スコープ切替バー -->
+        <div class="flex flex-wrap items-center gap-2 bg-slate-950/90 border border-indigo-500/40 rounded-lg px-2.5 py-1.5 text-xs">
+          <span class="font-bold text-indigo-300 text-[11px]">🎯 学習データの適用単位:</span>
+          <select id="learnedScopeMode" onchange="applyLearnedFeedbackParams(false)" class="font-bold text-amber-200">
+            <option value="blend" selected>⚖️ 3層ブレンド（節50%＋場30%＋全体20%）</option>
+            <option value="series">🏆 節ごと適用（選択した節の傾向をそのまま反映）</option>
+            <option value="venue">🏟️ レース場ごと適用（現在の場の蓄積傾向）</option>
+            <option value="global">🌐 全体適用（全蓄積レースのベース傾向）</option>
+          </select>
+          <span class="font-bold text-teal-300 text-[11px] ml-1">適用する節:</span>
+          <select id="learnedSeriesSelect" onchange="applyLearnedFeedbackParams(false)" class="font-bold text-indigo-200 max-w-[280px]">
+            <option value="">（蓄積された節なし）</option>
+          </select>
+          <span id="learnedLayerCounts" class="text-[10px] font-mono text-slate-400 ml-auto">🌐全体:0R ｜ 🏟️場:0R ｜ 🏆節:0R</span>
+        </div>
         <div id="learningDetailBar" class="text-[11px] text-slate-300 bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-1.5 leading-relaxed">
           💡 「🔬 結果振り返りサイト」で保存したレース履歴、または右上の「➕ この場でレース結果を10秒蓄積」で登録した確定結果（1Mの攻め方・道中逆転有無）が自動的にここに蓄積され、会場ごとのイン/まくり/差し/展開待ち補正と4大重み付けスライダーを自動進化させます。
         </div>
@@ -869,6 +889,10 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
           <div class="flex items-center justify-between border-b border-slate-800 pb-1">
             <span class="font-bold text-teal-300">🏁 レース結果クイック蓄積（保存すると即座に学習DBへ加算＆予想ロジックが進化します）</span>
             <button onclick="document.getElementById('quickReviewBox').classList.add('hidden')" class="text-slate-400 hover:text-white">✕ 閉じる</button>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 bg-slate-900/80 border border-indigo-500/30 rounded px-2 py-1">
+            <label for="q_seriesName" class="text-[10px] font-bold text-indigo-300 whitespace-nowrap">🏆 節名（節ごと蓄積キー）</label>
+            <input type="text" id="q_seriesName" placeholder="例: SGチャレンジカップ / 2026年11月一般戦（空欄なら当月・場名で自動登録）" class="flex-1 min-w-[200px] text-xs font-bold text-indigo-100" />
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
             <div>
@@ -1903,17 +1927,16 @@ const UIManager = {
         return { wc, we, wm, ws };
       }
 
-      function rebuildLearnedParamsFromLogs(logs) {
-        if (!Array.isArray(logs) || logs.length === 0) return null;
-        const total = logs.length;
-        const nigeCnt = logs.filter(x => x.kimarite === "nige").length;
-        const m1MakuriAtkCnt = logs.filter(x => ["center_makuri_atk", "center_nosqueeze_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length;
-        const sashiCnt = logs.filter(x => x.kimarite === "sashi").length;
-        const makurisashiCnt = logs.filter(x => x.kimarite === "makurisashi" || ["center_ms_atk", "outer_ms_atk"].includes(x.firstMarkPat)).length;
-        const dochuOvertakeCnt = logs.filter(x => x.dochuType && x.dochuType !== "none").length;
-        const turnPowerCnt = logs.filter(x => x.dochuReason === "turn_power" || x.dochuReason === "racer_skill").length;
-        const clashWaitCnt = logs.filter(x => x.firstMarkPat === "clash_wait").length;
-        const thirdMissCnt = logs.filter(x => x.missedThirdOnly).length;
+      function calcSimLearnedPack(list) {
+        const total = list.length;
+        const nigeCnt = list.filter(x => x.kimarite === "nige").length;
+        const m1MakuriAtkCnt = list.filter(x => ["center_makuri_atk", "center_nosqueeze_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length;
+        const sashiCnt = list.filter(x => x.kimarite === "sashi").length;
+        const makurisashiCnt = list.filter(x => x.kimarite === "makurisashi" || ["center_ms_atk", "outer_ms_atk"].includes(x.firstMarkPat)).length;
+        const dochuOvertakeCnt = list.filter(x => x.dochuType && x.dochuType !== "none").length;
+        const turnPowerCnt = list.filter(x => x.dochuReason === "turn_power" || x.dochuReason === "racer_skill").length;
+        const clashWaitCnt = list.filter(x => x.firstMarkPat === "clash_wait").length;
+        const thirdMissCnt = list.filter(x => x.missedThirdOnly).length;
 
         const nigeRatio = nigeCnt / total;
         const makuriRatio = m1MakuriAtkCnt / total;
@@ -1926,46 +1949,68 @@ const UIManager = {
         const w_motor = Math.min(190, Math.max(80, Math.round((100 + dochuRatio * 60 + (sashiRatio + makurisashiRatio) * 35) / 5) * 5));
         const w_slit = Math.min(190, Math.max(80, Math.round((100 + (makuriRatio - 0.20) * 130 + makurisashiRatio * 35) / 5) * 5));
 
-        const inModAdj = Math.round((nigeRatio - 0.52) * 24);
-        const makuriModAdj = Math.round((makuriRatio - 0.22) * 28);
-        const sashiModAdj = Math.round((sashiRatio - 0.16) * 26);
-        const makurisashiModAdj = Math.round((makurisashiRatio - 0.14) * 30);
-        const waitBonusAdj = Math.min(22, thirdMissCnt * 5 + clashWaitCnt * 6 + dochuOvertakeCnt * 3);
+        return {
+          count: total,
+          hitRate: Math.round((list.filter(x => x.isHit).length / total) * 100),
+          dochuRate: Math.round(dochuRatio * 100),
+          weights: { w_course, w_exhibit, w_motor, w_slit },
+          inModAdj: Math.round((nigeRatio - 0.52) * 24),
+          makuriModAdj: Math.round((makuriRatio - 0.22) * 28),
+          sashiModAdj: Math.round((sashiRatio - 0.16) * 26),
+          makurisashiModAdj: Math.round((makurisashiRatio - 0.14) * 30),
+          waitBonusAdj: Math.min(22, thirdMissCnt * 5 + clashWaitCnt * 6 + dochuOvertakeCnt * 3)
+        };
+      }
+
+      function rebuildLearnedParamsFromLogs(logs) {
+        if (!Array.isArray(logs) || logs.length === 0) return null;
+        const globalPack = calcSimLearnedPack(logs);
 
         const venueBiases = {};
         const byVenue = {};
+        const seriesBiases = {};
+        const bySeries = {};
+
         logs.forEach(item => {
           const v = item.venue || "平和島";
           if (!byVenue[v]) byVenue[v] = [];
           byVenue[v].push(item);
+
+          const sName = (item.seriesName || "").trim() || `${v}節(未指定)`;
+          const sKey = item.seriesKey || `${v}｜${sName}`;
+          if (!bySeries[sKey]) bySeries[sKey] = { venue: v, seriesName: sName, seriesKey: sKey, list: [] };
+          bySeries[sKey].list.push(item);
         });
+
         Object.keys(byVenue).forEach(v => {
-          const list = byVenue[v];
-          const vc = list.length;
-          const vNige = list.filter(x => x.kimarite === "nige").length / vc;
-          const vMak = list.filter(x => ["center_makuri_atk", "center_nosqueeze_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length / vc;
-          const vSas = list.filter(x => x.kimarite === "sashi").length / vc;
-          const vMs = list.filter(x => x.kimarite === "makurisashi" || ["center_ms_atk", "outer_ms_atk"].includes(x.firstMarkPat)).length / vc;
-          const vWait = list.filter(x => x.missedThirdOnly || x.firstMarkPat === "clash_wait" || (x.dochuType && x.dochuType !== "none")).length;
-          venueBiases[v] = {
-            count: vc,
-            inModAdj: Math.round((vNige - 0.52) * 24),
-            makuriModAdj: Math.round((vMak - 0.22) * 28),
-            sashiModAdj: Math.round((vSas - 0.16) * 26),
-            makurisashiModAdj: Math.round((vMs - 0.14) * 30),
-            waitBonusAdj: Math.min(22, vWait * 5)
+          venueBiases[v] = calcSimLearnedPack(byVenue[v]);
+        });
+        Object.keys(bySeries).forEach(sKey => {
+          const entry = bySeries[sKey];
+          seriesBiases[sKey] = {
+            venue: entry.venue,
+            seriesName: entry.seriesName,
+            seriesKey: sKey,
+            ...calcSimLearnedPack(entry.list)
           };
         });
 
         const learnedObj = {
           type: "BOATRACE_LEARNED_PARAMS",
-          sampleCount: total,
-          hitRate: Math.round((logs.filter(x => x.isHit).length / total) * 100),
-          dochuRate: Math.round(dochuRatio * 100),
-          weights: { w_course, w_exhibit, w_motor, w_slit },
-          bias: { inModAdj, makuriModAdj, sashiModAdj, makurisashiModAdj, waitBonusAdj },
+          sampleCount: globalPack.count,
+          hitRate: globalPack.hitRate,
+          dochuRate: globalPack.dochuRate,
+          weights: globalPack.weights,
+          bias: {
+            inModAdj: globalPack.inModAdj,
+            makuriModAdj: globalPack.makuriModAdj,
+            sashiModAdj: globalPack.sashiModAdj,
+            makurisashiModAdj: globalPack.makurisashiModAdj,
+            waitBonusAdj: globalPack.waitBonusAdj
+          },
           venueBiases,
-          recentLogs: logs.slice(0, 20),
+          seriesBiases,
+          recentLogs: logs.slice(0, 30),
           updatedAt: new Date().toLocaleTimeString()
         };
         try { localStorage.setItem("BOATRACE_LEARNED_PARAMS", JSON.stringify(learnedObj)); } catch (e) {}
@@ -1977,6 +2022,11 @@ const UIManager = {
         const venue = (VENUE_MASTER[vCode] || VENUE_MASTER["04"]).name;
         const raceNo = document.getElementById("raceNoSelect")?.value || "12";
         const grade = document.getElementById("raceGradeSelect")?.value || "G1";
+        const now = new Date();
+        const ymFallback = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const seriesName = (document.getElementById("q_seriesName")?.value || "").trim() || `${ymFallback} ${venue}節`;
+        const seriesKey = `${venue}｜${seriesName}`;
+
         const f1 = Number(document.getElementById("q_fin1").value);
         const f2 = Number(document.getElementById("q_fin2").value);
         const f3 = Number(document.getElementById("q_fin3").value);
@@ -2002,7 +2052,7 @@ const UIManager = {
 
         const kimMap = { nige: "逃げ", sashi: "差し", makuri: "まくり", makurisashi: "まくり差し", nuki: "抜き" };
         logs.unshift({
-          venue, raceNo, grade, actualCombo, kimarite,
+          venue, seriesName, seriesKey, raceNo, grade, actualCombo, kimarite,
           kimariteName: kimMap[kimarite] || "逃げ",
           firstMarkPat, dochuType, dochuReason,
           payout: 0,
@@ -2011,6 +2061,10 @@ const UIManager = {
 
         try { localStorage.setItem("BOATRACE_REVIEW_LOGS", JSON.stringify(logs)); } catch (e) {}
         rebuildLearnedParamsFromLogs(logs);
+        const serSel = document.getElementById("learnedSeriesSelect");
+        if (serSel) {
+          serSel.dataset.preferredSeries = seriesKey;
+        }
         applyLearnedFeedbackParams(false);
       }
 
@@ -2018,9 +2072,10 @@ const UIManager = {
         learnedBias = { inModAdj: 0, makuriModAdj: 0, sashiModAdj: 0, makurisashiModAdj: 0, waitBonusAdj: 0, sampleCount: 0 };
         setWeightPreset(100, 100, 100, 100);
         const badge = document.getElementById("learnedCountBadge");
-        if (badge) badge.textContent = "補正オフ (標準100%)";
+        if (badge) badge.textContent = "蓄積補正: オフ (初期値)";
         const bar = document.getElementById("learningDetailBar");
         if (bar) bar.innerHTML = "現在は振り返り学習補正をオフ（初期値100%）にしています。「🔄 蓄積データを再読込・適用」を押すと再度反映されます。";
+        runSimulation();
       }
 
       function applyLearnedFeedbackParams(promptIfMissing = false) {
@@ -2050,37 +2105,145 @@ const UIManager = {
         }
 
         if (parsed && parsed.weights) {
-          document.getElementById("w_course").value = parsed.weights.w_course ?? 100;
-          document.getElementById("w_exhibit").value = parsed.weights.w_exhibit ?? 100;
-          document.getElementById("w_motor").value = parsed.weights.w_motor ?? 100;
-          document.getElementById("w_slit").value = parsed.weights.w_slit ?? 100;
-
           const vCode = document.getElementById("venueSelect").value;
           const vName = (VENUE_MASTER[vCode] || VENUE_MASTER["04"]).name;
           const vSpecific = parsed.venueBiases && parsed.venueBiases[vName];
+          const seriesMap = parsed.seriesBiases || {};
+          const seriesKeys = Object.keys(seriesMap);
 
-          if (vSpecific && vSpecific.count >= 1) {
-            learnedBias = { ...vSpecific, sampleCount: parsed.sampleCount || vSpecific.count, venueCount: vSpecific.count };
-          } else if (parsed.bias) {
-            learnedBias = { ...parsed.bias, sampleCount: parsed.sampleCount || 1, venueCount: 0 };
+          const serSel = document.getElementById("learnedSeriesSelect");
+          let selectedSeriesKey = "";
+          if (serSel) {
+            const prevVal = serSel.dataset.preferredSeries || serSel.value;
+            delete serSel.dataset.preferredSeries;
+            if (seriesKeys.length === 0) {
+              serSel.innerHTML = `<option value="">（蓄積された節なし）</option>`;
+            } else {
+              serSel.innerHTML = seriesKeys.map(k => {
+                const s = seriesMap[k];
+                return `<option value="${k}">🏆 ${s.venue}｜${s.seriesName} (${s.count}R)</option>`;
+              }).join("");
+              const qSerVal = (document.getElementById("q_seriesName")?.value || "").trim();
+              const curRaceSeriesKey = qSerVal ? `${vName}｜${qSerVal}` : "";
+              if (prevVal && seriesMap[prevVal]) {
+                serSel.value = prevVal;
+              } else if (curRaceSeriesKey && seriesMap[curRaceSeriesKey]) {
+                serSel.value = curRaceSeriesKey;
+              } else {
+                const sameVenueKey = seriesKeys.find(k => seriesMap[k].venue === vName);
+                serSel.value = sameVenueKey || seriesKeys[0];
+              }
+            }
+            selectedSeriesKey = serSel.value || "";
           }
+          const sSpecific = selectedSeriesKey ? seriesMap[selectedSeriesKey] : null;
+          const gBias = parsed.bias || { inModAdj: 0, makuriModAdj: 0, sashiModAdj: 0, makurisashiModAdj: 0, waitBonusAdj: 0 };
+          const gWeights = parsed.weights || { w_course: 100, w_exhibit: 100, w_motor: 100, w_slit: 100 };
+
+          const scopeMode = document.getElementById("learnedScopeMode")?.value || "blend";
+          let activeBias = { ...gBias };
+          let activeWeights = { ...gWeights };
+          let activeScopeLabel = "🌐 全体適用";
+
+          const blendField = (f, parts) => {
+            let num = 0, den = 0;
+            parts.forEach(([obj, wt]) => {
+              if (obj && Number.isFinite(Number(obj[f]))) {
+                num += Number(obj[f]) * wt;
+                den += wt;
+              }
+            });
+            return den > 0 ? Math.round(num / den) : 0;
+          };
+
+          if (scopeMode === "series") {
+            if (sSpecific) {
+              activeBias = {
+                inModAdj: sSpecific.inModAdj || 0,
+                makuriModAdj: sSpecific.makuriModAdj || 0,
+                sashiModAdj: sSpecific.sashiModAdj || 0,
+                makurisashiModAdj: sSpecific.makurisashiModAdj || 0,
+                waitBonusAdj: sSpecific.waitBonusAdj || 0
+              };
+              activeWeights = sSpecific.weights || gWeights;
+              activeScopeLabel = `🏆 節ごと適用（${sSpecific.venue}｜${sSpecific.seriesName}：${sSpecific.count}R）`;
+            } else if (vSpecific) {
+              activeBias = { ...vSpecific };
+              activeWeights = vSpecific.weights || gWeights;
+              activeScopeLabel = `🏟️ ${vName}適用（選択節なしのため場別へフォールバック）`;
+            }
+          } else if (scopeMode === "venue") {
+            if (vSpecific) {
+              activeBias = {
+                inModAdj: vSpecific.inModAdj || 0,
+                makuriModAdj: vSpecific.makuriModAdj || 0,
+                sashiModAdj: vSpecific.sashiModAdj || 0,
+                makurisashiModAdj: vSpecific.makurisashiModAdj || 0,
+                waitBonusAdj: vSpecific.waitBonusAdj || 0
+              };
+              activeWeights = vSpecific.weights || gWeights;
+              activeScopeLabel = `🏟️ レース場ごと適用（${vName}：${vSpecific.count}R）`;
+            } else {
+              activeScopeLabel = `🌐 全体適用（${vName}の蓄積0Rのため全体を使用）`;
+            }
+          } else if (scopeMode === "global") {
+            activeScopeLabel = `🌐 全体適用（全${parsed.sampleCount || 1}R）`;
+          } else {
+            const biasParts = [];
+            const weightParts = [];
+            if (sSpecific) { biasParts.push([sSpecific, 0.50]); weightParts.push([sSpecific.weights || gWeights, 0.50]); }
+            if (vSpecific) { biasParts.push([vSpecific, 0.30]); weightParts.push([vSpecific.weights || gWeights, 0.30]); }
+            biasParts.push([gBias, 0.20]);
+            weightParts.push([gWeights, 0.20]);
+
+            activeBias = {
+              inModAdj: blendField("inModAdj", biasParts),
+              makuriModAdj: blendField("makuriModAdj", biasParts),
+              sashiModAdj: blendField("sashiModAdj", biasParts),
+              makurisashiModAdj: blendField("makurisashiModAdj", biasParts),
+              waitBonusAdj: blendField("waitBonusAdj", biasParts)
+            };
+            activeWeights = {
+              w_course: Math.round(blendField("w_course", weightParts) / 5) * 5,
+              w_exhibit: Math.round(blendField("w_exhibit", weightParts) / 5) * 5,
+              w_motor: Math.round(blendField("w_motor", weightParts) / 5) * 5,
+              w_slit: Math.round(blendField("w_slit", weightParts) / 5) * 5
+            };
+            activeScopeLabel = `⚖️ 3層ブレンド（${sSpecific ? `節:${sSpecific.count}R` : "節なし"} ＋ ${vSpecific ? `${vName}:${vSpecific.count}R` : `${vName}:0R`} ＋ 全体:${parsed.sampleCount || 1}R）`;
+          }
+
+          document.getElementById("w_course").value = activeWeights.w_course ?? 100;
+          document.getElementById("w_exhibit").value = activeWeights.w_exhibit ?? 100;
+          document.getElementById("w_motor").value = activeWeights.w_motor ?? 100;
+          document.getElementById("w_slit").value = activeWeights.w_slit ?? 100;
+
+          learnedBias = {
+            ...activeBias,
+            sampleCount: parsed.sampleCount || 1,
+            venueCount: vSpecific ? vSpecific.count : 0,
+            seriesCount: sSpecific ? sSpecific.count : 0
+          };
 
           const badge = document.getElementById("learnedCountBadge");
           if (badge) {
-            badge.textContent = `✅ 蓄積: 全${parsed.sampleCount || 1}R (${vName}:${learnedBias.venueCount || 0}R) 自動反映中`;
+            badge.textContent = `✅ 蓄積: 全${parsed.sampleCount || 1}R ｜ ${vName}:${learnedBias.venueCount}R ｜ 節:${learnedBias.seriesCount}R`;
+          }
+          const layerEl = document.getElementById("learnedLayerCounts");
+          if (layerEl) {
+            layerEl.textContent = `🌐全体:${parsed.sampleCount || 1}R ｜ 🏟️${vName}:${learnedBias.venueCount}R ｜ 🏆選択節:${learnedBias.seriesCount}R`;
           }
           const bar = document.getElementById("learningDetailBar");
           if (bar) {
-            bar.innerHTML = `🧠 <strong>全${parsed.sampleCount || 1}レースの振り返りデータ（道中逆転率 ${parsed.dochuRate || 0}%）を自動学習・適用中！</strong><br>` +
-              `・自動最適化された重み付け：<strong>[①コース実績:${parsed.weights.w_course}% ／ ②展示気配:${parsed.weights.w_exhibit}% ／ ③勝率・機力:${parsed.weights.w_motor}% ／ ④スリット連動:${parsed.weights.w_slit}%]</strong><br>` +
-              `・現在の水面・展開バイアス補正（${vName}）：<strong>[イン補正 ${learnedBias.inModAdj >= 0 ? "+" : ""}${learnedBias.inModAdj} ／ まくり補正 ${learnedBias.makuriModAdj >= 0 ? "+" : ""}${learnedBias.makuriModAdj} ／ まくり差し補正 ${(learnedBias.makurisashiModAdj || 0) >= 0 ? "+" : ""}${learnedBias.makurisashiModAdj || 0} ／ 差し補正 ${learnedBias.sashiModAdj >= 0 ? "+" : ""}${learnedBias.sashiModAdj} ／ 3着展開待ち・道中浮上ボーナス +${learnedBias.waitBonusAdj}]</strong>`;
+            bar.innerHTML = `🧠 <strong>${activeScopeLabel}</strong>（道中逆転率 ${parsed.dochuRate || 0}%）<br>` +
+              `・適用中の重み付け：<strong>[①コース実績:${activeWeights.w_course}% ／ ②展示気配:${activeWeights.w_exhibit}% ／ ③勝率・機力:${activeWeights.w_motor}% ／ ④スリット連動:${activeWeights.w_slit}%]</strong><br>` +
+              `・適用中の展開バイアス補正：<strong>[イン補正 ${learnedBias.inModAdj >= 0 ? "+" : ""}${learnedBias.inModAdj} ／ まくり補正 ${learnedBias.makuriModAdj >= 0 ? "+" : ""}${learnedBias.makuriModAdj} ／ まくり差し補正 ${(learnedBias.makurisashiModAdj || 0) >= 0 ? "+" : ""}${learnedBias.makurisashiModAdj || 0} ／ 差し補正 ${learnedBias.sashiModAdj >= 0 ? "+" : ""}${learnedBias.sashiModAdj} ／ 3着展開待ち・道中浮上 +${learnedBias.waitBonusAdj}]</strong>`;
           }
 
           const qList = document.getElementById("quickAccumulatedList");
           if (qList && Array.isArray(parsed.recentLogs)) {
             qList.innerHTML = parsed.recentLogs.slice(0, 8).map((item, idx) =>
               `<div class="flex items-center justify-between bg-slate-900 px-2 py-1 rounded border border-slate-800">` +
-              `<span>#${parsed.sampleCount - idx} <strong>${item.venue}${item.raceNo}R</strong> 確定:<strong class="text-teal-300 font-mono">${item.actualCombo}</strong> (${item.kimariteName})</span>` +
+              `<span>#${parsed.sampleCount - idx} <strong>${item.venue}${item.raceNo}R</strong>${item.seriesName ? ` <span class="text-[10px] text-indigo-300">[${item.seriesName}]</span>` : ""} 確定:<strong class="text-teal-300 font-mono">${item.actualCombo}</strong> (${item.kimariteName})</span>` +
               `<span class="text-[10px] text-amber-300">1M:${item.firstMarkPat || "-"} ／ 道中:${item.dochuType === "none" ? "1M通り" : item.dochuType}</span>` +
               `</div>`
             ).join("");
@@ -2248,6 +2411,7 @@ const UIManager = {
         const vCode = document.getElementById("venueSelect").value;
         const v = VENUE_MASTER[vCode] || VENUE_MASTER["04"];
         document.getElementById("venueTraitBadge").textContent = `${v.name}：${v.desc}`;
+        if (learnedBias.sampleCount > 0) { applyLearnedFeedbackParams(false); return; }
         runSimulation();
       }
 
@@ -4808,6 +4972,13 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
               </div>
             </div>
 
+            <!-- 節名・開催タイトル（節ごと蓄積＆適用キー） -->
+            <div class="flex flex-wrap items-center gap-2 bg-slate-950/70 border border-indigo-500/30 rounded-lg px-2.5 py-1.5 text-xs">
+              <label for="revSeriesName" class="text-[11px] font-bold text-indigo-300 whitespace-nowrap">🏆 節名（節ごと学習キー）</label>
+              <input type="text" id="revSeriesName" value="G1トーキョー・ベイ・カップ" placeholder="例: SGチャレンジカップ / 2026年11月一般戦" onchange="runReviewAnalysis()" class="flex-1 min-w-[200px] font-bold text-indigo-100" />
+              <span class="text-[10px] text-slate-400">※ 全体・レース場ごと・節ごとの3層で自動蓄積されます</span>
+            </div>
+
             <!-- 6艇の展示ST vs 本番ST ＆ 1M実際の動きテーブル -->
             <div class="pt-2 border-t border-slate-800">
               <div class="flex items-center justify-between mb-1">
@@ -5025,6 +5196,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
       function loadSampleCase(mode) {
         if (mode === "makuri_hit") {
           document.getElementById("revVenue").value = "平和島";
+          if (document.getElementById("revSeriesName")) document.getElementById("revSeriesName").value = "G1トーキョー・ベイ・カップ";
           document.getElementById("revRaceNo").value = "12";
           document.getElementById("revGrade").value = "G1";
           document.getElementById("fin1").value = "4";
@@ -5081,6 +5253,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           };
         } else if (mode === "makurisashi_hit") {
           document.getElementById("revVenue").value = "尼崎";
+          if (document.getElementById("revSeriesName")) document.getElementById("revSeriesName").value = "G1尼崎センプルカップ";
           document.getElementById("revRaceNo").value = "12";
           document.getElementById("revGrade").value = "G1";
           document.getElementById("fin1").value = "3";
@@ -5108,6 +5281,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           };
         } else {
           document.getElementById("revVenue").value = "大村";
+          if (document.getElementById("revSeriesName")) document.getElementById("revSeriesName").value = "SGグランプリシリーズ";
           document.getElementById("revRaceNo").value = "12";
           document.getElementById("revGrade").value = "SG";
           document.getElementById("fin1").value = "1";
@@ -5226,6 +5400,11 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         }
 
         const resDoc = parser.parseFromString(resHtml, "text/html");
+        const h2Title = resDoc.querySelector("div.heading2_title h2");
+        if (h2Title && document.getElementById("revSeriesName")) {
+          const t = h2Title.textContent.replace(/\s+/g, " ").trim();
+          if (t) document.getElementById("revSeriesName").value = t;
+        }
         const fullText = resDoc.body.textContent.replace(/\s+/g, " ");
         if (fullText.includes("データがありません")) {
           msgEl.textContent = `⚠️ ${dateVal} ${vName} ${rno}R は結果未確定または非開催です。`;
@@ -5492,6 +5671,10 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         const venue = document.getElementById("revVenue").value;
         const raceNo = document.getElementById("revRaceNo").value;
         const grade = document.getElementById("revGrade").value;
+        const rawDate = document.getElementById("fetchDateInput")?.value || "";
+        const ymFallback = rawDate ? rawDate.slice(0, 7) : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+        const seriesName = (document.getElementById("revSeriesName")?.value || "").trim() || `${ymFallback} ${venue}節`;
+        const seriesKey = `${venue}｜${seriesName}`;
         const f1 = Number(document.getElementById("fin1").value);
         const f2 = Number(document.getElementById("fin2").value);
         const f3 = Number(document.getElementById("fin3").value);
@@ -5726,6 +5909,9 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
 
         reviewLogs.unshift({
           venue,
+          seriesName,
+          seriesKey,
+          raceDate: rawDate,
           raceNo,
           grade,
           actualCombo,
@@ -5749,19 +5935,17 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
       }
 
 
-      function computeAndSaveLearnedParams() {
-        if (reviewLogs.length === 0) return null;
-        const total = reviewLogs.length;
-        const nigeCnt = reviewLogs.filter(x => x.kimarite === "nige").length;
-        const makuriCnt = reviewLogs.filter(x => x.kimarite === "makuri").length;
-        const sashiCnt = reviewLogs.filter(x => x.kimarite === "sashi").length;
-        const makurisashiCnt = reviewLogs.filter(x => x.kimarite === "makurisashi" || ["center_ms_atk", "outer_ms_atk"].includes(x.firstMarkPat)).length;
-        const thirdMissCnt = reviewLogs.filter(x => x.missedThirdOnly).length;
-
-        const dochuOvertakeCnt = reviewLogs.filter(x => x.dochuType && x.dochuType !== "none").length;
-        const turnPowerCnt = reviewLogs.filter(x => x.dochuReason === "turn_power" || x.dochuReason === "racer_skill").length;
-        const clashWaitCnt = reviewLogs.filter(x => x.firstMarkPat === "clash_wait").length;
-        const m1MakuriAtkCnt = reviewLogs.filter(x => ["center_makuri_atk", "center_nosqueeze_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length;
+      function calcLearnedPackFromList(list) {
+        const total = list.length;
+        const nigeCnt = list.filter(x => x.kimarite === "nige").length;
+        const sashiCnt = list.filter(x => x.kimarite === "sashi").length;
+        const makuriCnt = list.filter(x => x.kimarite === "makuri").length;
+        const makurisashiCnt = list.filter(x => x.kimarite === "makurisashi" || ["center_ms_atk", "outer_ms_atk"].includes(x.firstMarkPat)).length;
+        const thirdMissCnt = list.filter(x => x.missedThirdOnly).length;
+        const dochuOvertakeCnt = list.filter(x => x.dochuType && x.dochuType !== "none").length;
+        const turnPowerCnt = list.filter(x => x.dochuReason === "turn_power" || x.dochuReason === "racer_skill").length;
+        const clashWaitCnt = list.filter(x => x.firstMarkPat === "clash_wait").length;
+        const m1MakuriAtkCnt = list.filter(x => ["center_makuri_atk", "center_nosqueeze_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length;
 
         const nigeRatio = nigeCnt / total;
         const makuriRatio = m1MakuriAtkCnt / total;
@@ -5769,54 +5953,76 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         const makurisashiRatio = makurisashiCnt / total;
         const dochuRatio = dochuOvertakeCnt / total;
 
-        // 1M展開要因（スリット・コース攻め）と道中逆転要因（展示気配・モーター・実力）を分離して重み付け学習
         const w_course = Math.min(180, Math.max(70, Math.round((100 + (sashiRatio + makurisashiRatio - 0.25) * 85 + (nigeRatio - 0.50) * 35) / 5) * 5));
         const w_exhibit = Math.min(190, Math.max(80, Math.round((105 + dochuRatio * 55 + (turnPowerCnt / total) * 45) / 5) * 5));
         const w_motor = Math.min(190, Math.max(80, Math.round((100 + dochuRatio * 60 + (sashiRatio + makurisashiRatio) * 35) / 5) * 5));
         const w_slit = Math.min(190, Math.max(80, Math.round((100 + (makuriRatio - 0.20) * 130 + makurisashiRatio * 35) / 5) * 5));
 
-        const inModAdj = Math.round((nigeRatio - 0.52) * 24);
-        const makuriModAdj = Math.round((makuriRatio - 0.22) * 28);
-        const sashiModAdj = Math.round((sashiRatio - 0.16) * 26);
-        const makurisashiModAdj = Math.round((makurisashiRatio - 0.14) * 30);
-        const waitBonusAdj = Math.min(22, thirdMissCnt * 5 + clashWaitCnt * 6 + dochuOvertakeCnt * 3);
+        return {
+          count: total,
+          hitRate: Math.round((list.filter(x => x.isHit).length / total) * 100),
+          m1HitRate: Math.round((list.filter(x => x.isM1Hit || x.isHit).length / total) * 100),
+          dochuRate: Math.round(dochuRatio * 100),
+          weights: { w_course, w_exhibit, w_motor, w_slit },
+          inModAdj: Math.round((nigeRatio - 0.52) * 24),
+          makuriModAdj: Math.round((makuriRatio - 0.22) * 28),
+          sashiModAdj: Math.round((sashiRatio - 0.16) * 26),
+          makurisashiModAdj: Math.round((makurisashiRatio - 0.14) * 30),
+          waitBonusAdj: Math.min(22, thirdMissCnt * 5 + clashWaitCnt * 6 + dochuOvertakeCnt * 3),
+          breakdown: { nige: nigeCnt, sashi: sashiCnt, makuri: makuriCnt, makurisashi: makurisashiCnt }
+        };
+      }
 
-        // 会場別（24場別）の蓄積バイアスも個別に計算して保持
+      function computeAndSaveLearnedParams() {
+        if (reviewLogs.length === 0) return null;
+        const globalPack = calcLearnedPackFromList(reviewLogs);
+
         const venueBiases = {};
         const byVenue = {};
+        const seriesBiases = {};
+        const bySeries = {};
+
         reviewLogs.forEach(item => {
           const v = item.venue || "平和島";
           if (!byVenue[v]) byVenue[v] = [];
           byVenue[v].push(item);
+
+          const sName = (item.seriesName || "").trim() || `${v}節(未指定)`;
+          const sKey = item.seriesKey || `${v}｜${sName}`;
+          if (!bySeries[sKey]) bySeries[sKey] = { venue: v, seriesName: sName, seriesKey: sKey, list: [] };
+          bySeries[sKey].list.push(item);
         });
+
         Object.keys(byVenue).forEach(v => {
-          const list = byVenue[v];
-          const vc = list.length;
-          const vNige = list.filter(x => x.kimarite === "nige").length / vc;
-          const vMak = list.filter(x => ["center_makuri_atk", "center_nosqueeze_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length / vc;
-          const vSas = list.filter(x => x.kimarite === "sashi").length / vc;
-          const vMs = list.filter(x => x.kimarite === "makurisashi" || ["center_ms_atk", "outer_ms_atk"].includes(x.firstMarkPat)).length / vc;
-          const vWait = list.filter(x => x.missedThirdOnly || x.firstMarkPat === "clash_wait" || (x.dochuType && x.dochuType !== "none")).length;
-          venueBiases[v] = {
-            count: vc,
-            inModAdj: Math.round((vNige - 0.52) * 24),
-            makuriModAdj: Math.round((vMak - 0.22) * 28),
-            sashiModAdj: Math.round((vSas - 0.16) * 26),
-            makurisashiModAdj: Math.round((vMs - 0.14) * 30),
-            waitBonusAdj: Math.min(22, vWait * 5)
+          venueBiases[v] = calcLearnedPackFromList(byVenue[v]);
+        });
+        Object.keys(bySeries).forEach(sKey => {
+          const entry = bySeries[sKey];
+          seriesBiases[sKey] = {
+            venue: entry.venue,
+            seriesName: entry.seriesName,
+            seriesKey: sKey,
+            ...calcLearnedPackFromList(entry.list)
           };
         });
 
         const learnedObj = {
           type: "BOATRACE_LEARNED_PARAMS",
-          sampleCount: total,
-          hitRate: Math.round((reviewLogs.filter(x => x.isHit).length / total) * 100),
-          m1HitRate: Math.round((reviewLogs.filter(x => x.isM1Hit || x.isHit).length / total) * 100),
-          dochuRate: Math.round(dochuRatio * 100),
-          weights: { w_course, w_exhibit, w_motor, w_slit },
-          bias: { inModAdj, makuriModAdj, sashiModAdj, makurisashiModAdj, waitBonusAdj },
+          sampleCount: globalPack.count,
+          hitRate: globalPack.hitRate,
+          m1HitRate: globalPack.m1HitRate,
+          dochuRate: globalPack.dochuRate,
+          weights: globalPack.weights,
+          bias: {
+            inModAdj: globalPack.inModAdj,
+            makuriModAdj: globalPack.makuriModAdj,
+            sashiModAdj: globalPack.sashiModAdj,
+            makurisashiModAdj: globalPack.makurisashiModAdj,
+            waitBonusAdj: globalPack.waitBonusAdj
+          },
           venueBiases,
-          recentLogs: reviewLogs.slice(0, 20),
+          seriesBiases,
+          recentLogs: reviewLogs.slice(0, 30),
           updatedAt: new Date().toLocaleTimeString()
         };
 
@@ -5826,7 +6032,13 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
 
         const prevEl = document.getElementById("learnedParamsPreview");
         if (prevEl) {
-          prevEl.innerHTML = `全<strong>${total}R</strong>の蓄積結果から算出 → 推奨重み付け: <strong>[①コース:${w_course}% / ②展示:${w_exhibit}% / ③機力:${w_motor}% / ④スリット:${w_slit}%]</strong> ｜ 補正: <strong>[イン${inModAdj >= 0 ? "+" : ""}${inModAdj} / まくり${makuriModAdj >= 0 ? "+" : ""}${makuriModAdj} / まくり差し${makurisashiModAdj >= 0 ? "+" : ""}${makurisashiModAdj} / 差し${sashiModAdj >= 0 ? "+" : ""}${sashiModAdj} / 3着展開待ち+${waitBonusAdj}]</strong> （ブラウザ自動同期済）`;
+          const vCnt = Object.keys(venueBiases).length;
+          const sCnt = Object.keys(seriesBiases).length;
+          const w = globalPack.weights;
+          prevEl.innerHTML =
+            `🌐 <strong>全体 ${globalPack.count}R</strong> ／ 🏟️ <strong>場別 ${vCnt}場</strong> ／ 🏆 <strong>節別 ${sCnt}節</strong> を同時蓄積済！<br>` +
+            `全体ベース重み: <strong>[①コース:${w.w_course}% / ②展示:${w.w_exhibit}% / ③機力:${w.w_motor}% / ④スリット:${w.w_slit}%]</strong> ｜ ` +
+            `全体補正: <strong>[イン${globalPack.inModAdj >= 0 ? "+" : ""}${globalPack.inModAdj} / まくり${globalPack.makuriModAdj >= 0 ? "+" : ""}${globalPack.makuriModAdj} / まくり差し${globalPack.makurisashiModAdj >= 0 ? "+" : ""}${globalPack.makurisashiModAdj} / 差し${globalPack.sashiModAdj >= 0 ? "+" : ""}${globalPack.sashiModAdj} / 3着展開待ち+${globalPack.waitBonusAdj}]</strong>`;
         }
         return learnedObj;
       }
@@ -5881,7 +6093,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           <div class="flex items-center justify-between bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded">
             <div class="flex items-center gap-2">
               <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${item.isHit ? "bg-amber-400 text-slate-950" : "bg-slate-800 text-slate-400"}">${item.isHit ? "🎯一致" : "検証済"}</span>
-              <span class="font-bold text-white">${item.venue} ${item.raceNo}R (${item.grade})</span>
+              <span class="font-bold text-white">${item.venue} ${item.raceNo}R (${item.grade})</span>${item.seriesName ? `<span class="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-700/50 px-1.5 py-0.5 rounded">${item.seriesName}</span>` : ""}
               <span class="font-mono font-bold text-teal-300">${item.actualCombo}</span>
               <span class="text-[10px] text-slate-400">[${item.kimariteName}]</span>
             </div>
@@ -5965,6 +6177,14 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         if (meta.venueName) {
           const revV = document.getElementById("revVenue");
           if (revV) revV.value = meta.venueName;
+        }
+        if (meta.seriesName) {
+          const revS = document.getElementById("revSeriesName");
+          if (revS) revS.value = meta.seriesName;
+        }
+        if (meta.grade) {
+          const revG = document.getElementById("revGrade");
+          if (revG) revG.value = meta.grade;
         }
 
         if (data.boats) {
