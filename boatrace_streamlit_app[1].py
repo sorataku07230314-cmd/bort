@@ -2005,7 +2005,7 @@ const UIManager = {
           venue, raceNo, grade, actualCombo, kimarite,
           kimariteName: kimMap[kimarite] || "逃げ",
           firstMarkPat, dochuType, dochuReason,
-          payout: 0, invest: 4000, returnYen: isHit ? 6000 : 0,
+          payout: 0,
           isHit, missedThirdOnly: !isHit && has1st2nd
         });
 
@@ -4882,14 +4882,14 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
             </div>
           </div>
 
-          <!-- ② あなたの事前予想（買い目・想定展開・投資金額） -->
+          <!-- ② 事前予想の想定展開・買い目（答え合わせ＆学習用） -->
           <div class="bg-slate-900 border border-pink-500/40 rounded-xl p-3 space-y-2.5">
             <div class="flex flex-wrap items-center justify-between gap-1 border-b border-slate-800 pb-1.5">
-              <h2 class="text-xs font-bold text-pink-300">🎯 ② あなたが事前に予想していた内容（買い目・想定展開・投資金額）</h2>
+              <h2 class="text-xs font-bold text-pink-300">🎯 ② 事前予想の想定展開・買い目（答え合わせ＆学習用）</h2>
               <span class="text-[10px] text-slate-400">単発 `1-2-3` やフォーメーション `1-23-2345` に対応</span>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div class="grid grid-cols-1 gap-2 text-xs">
               <div>
                 <label class="block text-slate-400 text-[10px]">事前の本命シナリオ</label>
                 <select id="preExpectedScenario" onchange="runReviewAnalysis()" class="w-full font-bold text-pink-200">
@@ -4900,14 +4900,6 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
                   <option value="tenkaimachi">⏳ 展開待ち高配当狙い</option>
                   <option value="two_pattern">🔄 イン逃げ＋非インの2パターン</option>
                 </select>
-              </div>
-              <div>
-                <label class="block text-slate-400 text-[10px]">総投資額(円)</label>
-                <input type="number" id="totalInvestYen" value="4000" step="100" min="100" onchange="runReviewAnalysis()" class="w-full font-mono font-bold text-amber-300" />
-              </div>
-              <div>
-                <label class="block text-slate-400 text-[10px]">的中目の購入額(円/1点)</label>
-                <input type="number" id="hitTicketYen" value="500" step="100" min="100" onchange="runReviewAnalysis()" class="w-full font-mono font-bold text-emerald-300" />
               </div>
             </div>
 
@@ -4931,7 +4923,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           </div>
         </section>
 
-        <!-- 右カラム (6 cols): ④結果×予想 答え合わせ総合判定 ＋ ⑤シミュレーター設定フィードバック処方箋 ＋ ⑥X/note振り返り投稿生成 ＋ ⑦収支・研究履歴ログ -->
+        <!-- 右カラム (6 cols): ④結果×予想 答え合わせ総合判定 ＋ ⑤シミュレーター設定フィードバック処方箋 ＋ ⑥X/note振り返り投稿生成 ＋ ⑦レース結果・学習データ蓄積ログ -->
         <section class="lg:col-span-6 space-y-3">
           <!-- ④ 答え合わせ総合ジャッジ＆5段階敗因/勝因解剖 -->
           <div class="bg-slate-900 border-2 border-teal-500/40 rounded-xl p-3 space-y-2.5">
@@ -4944,7 +4936,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
                 </div>
               </div>
               <button onclick="saveCurrentReviewToLog()" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded shadow">
-                💾 このレースを研究履歴に保存
+                💾 レース結果を学習データに蓄積
               </button>
             </div>
 
@@ -4986,11 +4978,11 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
             <textarea id="retroReportTextarea" rows="13" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-[11px] font-mono text-slate-200 leading-relaxed focus:outline-none"></textarea>
           </div>
 
-          <!-- ⑦ 本日の研究・収支履歴ログ（累計的中率・回収率・傾向分析） -->
+          <!-- ⑦ 累計レース結果ログ ＆ シミュレーター学習データ蓄積 -->
           <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
               <div>
-                <h2 class="text-xs font-bold text-emerald-400">📈 ⑦ 累計レース振り返り履歴 ＆ 収支・弱点傾向サマリー</h2>
+                <h2 class="text-xs font-bold text-emerald-400">📈 ⑦ 累計レース結果ログ ＆ シミュレーター学習データ蓄積</h2>
                 <span id="logStatsSummary" class="text-[11px] font-mono text-slate-300">保存履歴: 0件</span>
               </div>
               <div class="flex items-center gap-1.5">
@@ -5046,8 +5038,6 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           document.getElementById("actualWindSpeed").value = "4";
           document.getElementById("actualKado").value = "4";
           document.getElementById("preExpectedScenario").value = "two_pattern";
-          document.getElementById("totalInvestYen").value = "4000";
-          document.getElementById("hitTicketYen").value = "500";
           document.getElementById("preBetsInput").value = "1-2-4, 1-4-2, 4-5-1, 4-1-5, 4-5-2, 3-4-5";
 
           document.getElementById("firstMarkPattern").value = "center_makuri_atk";
@@ -5076,8 +5066,6 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           document.getElementById("actualWindSpeed").value = "5";
           document.getElementById("actualKado").value = "4";
           document.getElementById("preExpectedScenario").value = "nige";
-          document.getElementById("totalInvestYen").value = "3600";
-          document.getElementById("hitTicketYen").value = "400";
           document.getElementById("preBetsInput").value = "1-2-3, 1-2-4, 1-3-2, 1-3-4, 1-4-2, 1-4-3";
 
           document.getElementById("firstMarkPattern").value = "c2_sashi_atk";
@@ -5106,9 +5094,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           document.getElementById("actualWindSpeed").value = "3";
           document.getElementById("actualKado").value = "4";
           document.getElementById("preExpectedScenario").value = "makurisashi";
-          document.getElementById("prePredictedBets").value = "3-1-2, 3-1-4, 3-1-5, 3-4-1, 3-4-5, 1-3-5";
-          document.getElementById("preInvestPerBet").value = "1000";
-          document.getElementById("preComment").value = "3号艇の回り足とスリット気配が抜群。1のイン先マイの懐を3がまくり差しで突き抜け、1残し＋外連動の5を3着押さえ。";
+          document.getElementById("preBetsInput").value = "3-1-2, 3-1-4, 3-1-5, 3-4-1, 3-4-5, 1-3-5";
           document.getElementById("firstMarkPattern").value = "center_ms_atk";
           document.getElementById("dochuOvertakeType").value = "none";
           document.getElementById("dochuReason").value = "none";
@@ -5135,8 +5121,6 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           document.getElementById("actualWindSpeed").value = "1";
           document.getElementById("actualKado").value = "4";
           document.getElementById("preExpectedScenario").value = "nige";
-          document.getElementById("totalInvestYen").value = "3000";
-          document.getElementById("hitTicketYen").value = "1000";
           document.getElementById("preBetsInput").value = "1-2-4, 1-4-2, 1-2-3, 1-3-2";
 
           document.getElementById("firstMarkPattern").value = "clean_in";
@@ -5527,14 +5511,9 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         }
 
         const preScenario = document.getElementById("preExpectedScenario").value;
-        const invest = Number(document.getElementById("totalInvestYen").value || 3000);
-        const hitUnitYen = Number(document.getElementById("hitTicketYen").value || 500);
         const userBets = parseUserBets(document.getElementById("preBetsInput").value);
 
         const isHit = userBets.includes(actualCombo);
-        const returnYen = isHit ? Math.round((payout / 100) * hitUnitYen) : 0;
-        const profitYen = returnYen - invest;
-        const roiPct = invest > 0 ? Math.round((returnYen / invest) * 100) : 0;
 
         const has1stHit = userBets.some(c => Number(c.split("-")[0]) === f1);
         const has1st2ndHit = userBets.some(c => {
@@ -5568,7 +5547,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         document.getElementById("resultSummaryTitle").textContent =
           `${venue} ${raceNo}R (${grade}) 確定結果：${actualCombo} （${b1.name} → ${b2.name} → ${b3.name} ／ 決まり手：${kimariteName}）`;
         document.getElementById("roiSummaryText").textContent =
-          `3連単配当: ${payout.toLocaleString()}円(${payoutPop}人気) ｜ 投資: ${invest.toLocaleString()}円 → 回収: ${returnYen.toLocaleString()}円 (収支 ${profitYen >= 0 ? "+" : ""}${profitYen.toLocaleString()}円 / 回収率 ${roiPct}%)`;
+          `3連単配当: ${payout.toLocaleString()}円(${payoutPop}人気) ／ 2連単: ${payout2t.toLocaleString()}円 ｜ 事前買い目 ${userBets.length}点と照合`;
 
         const boatsArr = Object.values(reviewBoats);
         const dokaBoats = boatsArr.filter(x => x.actualSt - x.preSt >= 0.03 || x.actualSt >= 0.18);
@@ -5671,7 +5650,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
             `🥉 3着：${f3}号艇 ${b3.name}`,
             ``,
             `事前のシミュレーター解析通り、${windDir}${windSpeed}mのスリット攻防から1M「${kimariteName}」→2・3着スジ連動（${f2}号艇・${f3}号艇）がドンピシャで決まりました🚤🔥`,
-            `回収率 ${roiPct}%（+${profitYen.toLocaleString()}円）達成！`,
+            `この展開・水面データもシミュレーター学習DBへ蓄積完了💻`,
             ``,
             `次レースの2パターン展開解析＆勝負目もnoteで公開中です👇`,
             `https://note.com/boatrace__daisu`,
@@ -5696,11 +5675,11 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
             `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
             `🎓 ぼーとだいがくせい｜${venue}${raceNo}R (${grade}) レース結果×予想 徹底振り返りレポート`,
             `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-            `■ 1. 確定結果・払戻・収支判定`,
+            `■ 1. 確定結果・展開判定`,
             `・確定着順: ${actualCombo} （1着:${f1}号艇 ${b1.name} → 2着:${f2}号艇 ${b2.name} → 3着:${f3}号艇 ${b3.name}）`,
             `・決まり手: ${kimariteName} ／ 3連単配当: ${payout.toLocaleString()}円 (${payoutPop}番人気) ／ 2連単: ${payout2t.toLocaleString()}円`,
             `・水面気象: ${windDir}${windSpeed}m`,
-            `・予想判定: ${isHit ? "🎯 的中" : "🔍 不的中（検証完了）"} （投資 ${invest.toLocaleString()}円 → 回収 ${returnYen.toLocaleString()}円 / 回収率 ${roiPct}%）`,
+            `・予想判定: ${isHit ? "🎯 展開＆買い目一致" : "🔍 検証完了（学習DB反映対象）"}`,
             ``,
             `■ 2. 展示ST vs 本番実STのズレ検証`,
             `・トップST: ${topStBoat.course}コース ${topStBoat.id}号艇 ${topStBoat.name} (実ST .${Math.round(topStBoat.actualSt*100).toString().padStart(2,"0")})`,
@@ -5729,11 +5708,8 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         const actualCombo = `${f1}-${f2}-${f3}`;
         const kimarite = document.getElementById("actualKimarite").value;
         const payout = Number(document.getElementById("payoutYen").value || 0);
-        const invest = Number(document.getElementById("totalInvestYen").value || 3000);
-        const hitUnitYen = Number(document.getElementById("hitTicketYen").value || 500);
         const userBets = parseUserBets(document.getElementById("preBetsInput").value);
         const isHit = userBets.includes(actualCombo);
-        const returnYen = isHit ? Math.round((payout / 100) * hitUnitYen) : 0;
 
         const has1st2nd = userBets.some(c => {
           const [a, b] = c.split("-").map(Number);
@@ -5760,8 +5736,6 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           dochuType,
           dochuReason,
           payout,
-          invest,
-          returnYen,
           isHit,
           isM1Hit,
           missedThirdOnly: !isHit && has1st2nd,
@@ -5890,28 +5864,29 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         const container = document.getElementById("reviewLogsContainer");
         const sumEl = document.getElementById("logStatsSummary");
         if (reviewLogs.length === 0) {
-          sumEl.textContent = "保存履歴: 0件";
-          container.innerHTML = `<div class="text-slate-500 text-[11px]">まだ保存されたレース履歴はありません。「💾 このレースを研究履歴に保存」を押すとここに蓄積されます。</div>`;
+          sumEl.textContent = "蓄積レース: 0件";
+          container.innerHTML = `<div class="text-slate-500 text-[11px]">まだ蓄積されたレース結果はありません。「💾 レース結果を学習データに蓄積」を押すとここに貯まり、シミュレーターの予測補正に活かされます。</div>`;
           return;
         }
         const totalRaces = reviewLogs.length;
         const hits = reviewLogs.filter(x => x.isHit).length;
-        const sumInv = reviewLogs.reduce((s, x) => s + x.invest, 0);
-        const sumRet = reviewLogs.reduce((s, x) => s + x.returnYen, 0);
-        const roi = sumInv > 0 ? Math.round((sumRet / sumInv) * 100) : 0;
-        const profit = sumRet - sumInv;
+        const m1Hits = reviewLogs.filter(x => x.isM1Hit || x.isHit).length;
+        const nigeC = reviewLogs.filter(x => x.kimarite === "nige").length;
+        const sashiC = reviewLogs.filter(x => x.kimarite === "sashi").length;
+        const makuriC = reviewLogs.filter(x => x.kimarite === "makuri").length;
+        const msC = reviewLogs.filter(x => x.kimarite === "makurisashi").length;
 
-        sumEl.textContent = `全${totalRaces}R ｜ 的中 ${hits}/${totalRaces} (${Math.round((hits/totalRaces)*100)}%) ｜ 累計回収率 ${roi}% (${profit >= 0 ? "+" : ""}${profit.toLocaleString()}円)`;
+        sumEl.textContent = `蓄積 ${totalRaces}R ｜ 展開的中 ${hits}/${totalRaces} (${Math.round((hits/totalRaces)*100)}%) ｜ 1M一致 ${m1Hits}/${totalRaces} ｜ 逃${nigeC}・差${sashiC}・捲${makuriC}・捲差${msC}`;
         container.innerHTML = reviewLogs.map((item) => `
           <div class="flex items-center justify-between bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded">
             <div class="flex items-center gap-2">
-              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${item.isHit ? "bg-amber-400 text-slate-950" : "bg-slate-800 text-slate-400"}">${item.isHit ? "🎯的中" : "不的中"}</span>
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${item.isHit ? "bg-amber-400 text-slate-950" : "bg-slate-800 text-slate-400"}">${item.isHit ? "🎯一致" : "検証済"}</span>
               <span class="font-bold text-white">${item.venue} ${item.raceNo}R (${item.grade})</span>
               <span class="font-mono font-bold text-teal-300">${item.actualCombo}</span>
-              <span class="text-[10px] text-slate-400">[${item.kimariteName} / ${item.payout.toLocaleString()}円]</span>
+              <span class="text-[10px] text-slate-400">[${item.kimariteName}]</span>
             </div>
-            <div class="font-mono text-[11px] ${item.returnYen - item.invest >= 0 ? "text-amber-300 font-bold" : "text-slate-400"}">
-              投資${item.invest.toLocaleString()}円 → 回収${item.returnYen.toLocaleString()}円
+            <div class="font-mono text-[10px] ${item.dochuType && item.dochuType !== "none" ? "text-sky-300" : "text-slate-400"}">
+              1M:${item.m1Combo || item.actualCombo} ｜ ${item.dochuType && item.dochuType !== "none" ? "道中逆転あり" : "1Mスジ通り"}
             </div>
           </div>
         `).join("");
