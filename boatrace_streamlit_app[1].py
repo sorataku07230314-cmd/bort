@@ -948,6 +948,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
               </button>
             </div>
           </div>
+          <div id="quickSaveToast" class="hidden text-[11px] font-bold text-emerald-200 bg-emerald-950/80 border border-emerald-500/60 rounded px-2.5 py-1"></div>
           <div id="quickAccumulatedList" class="text-[11px] text-slate-300 pt-1 border-t border-slate-800 max-h-[120px] overflow-y-auto space-y-1"></div>
         </div>
       </section>
@@ -1852,6 +1853,58 @@ const UIManager = {
       let liveOddsMap = {};
       let settledPayoutInfo = null;
       let learnedBias = { inModAdj: 0, makuriModAdj: 0, sashiModAdj: 0, makurisashiModAdj: 0, waitBonusAdj: 0, sampleCount: 0 };
+      const INJECTED_SERVER_LOGS = []; // __INJECTED_SERVER_LOGS_MARKER__
+      let inMemoryReviewLogs = [];
+
+      function safeGetStorage(key) {
+        try { const v = window.localStorage.getItem(key); if (v !== null) return v; } catch (e) {}
+        try { if (window.parent && window.parent !== window && window.parent.localStorage) { const v = window.parent.localStorage.getItem(key); if (v !== null) return v; } } catch (e) {}
+        try { const v = window.sessionStorage.getItem(key); if (v !== null) return v; } catch (e) {}
+        try { if (window.parent && window.parent.__BOATRACE_MEM_STORE__ && key in window.parent.__BOATRACE_MEM_STORE__) return window.parent.__BOATRACE_MEM_STORE__[key]; } catch (e) {}
+        try { if (window.__BOATRACE_MEM_STORE__ && key in window.__BOATRACE_MEM_STORE__) return window.__BOATRACE_MEM_STORE__[key]; } catch (e) {}
+        return null;
+      }
+
+      function safeSetStorage(key, val) {
+        try { window.localStorage.setItem(key, val); } catch (e) {}
+        try { if (window.parent && window.parent !== window && window.parent.localStorage) window.parent.localStorage.setItem(key, val); } catch (e) {}
+        try { window.sessionStorage.setItem(key, val); } catch (e) {}
+        try {
+          if (window.parent) {
+            window.parent.__BOATRACE_MEM_STORE__ = window.parent.__BOATRACE_MEM_STORE__ || {};
+            window.parent.__BOATRACE_MEM_STORE__[key] = val;
+          }
+        } catch (e) {}
+        window.__BOATRACE_MEM_STORE__ = window.__BOATRACE_MEM_STORE__ || {};
+        window.__BOATRACE_MEM_STORE__[key] = val;
+      }
+
+      function loadMergedReviewLogs() {
+        let logs = [];
+        try {
+          const raw = safeGetStorage("BOATRACE_REVIEW_LOGS");
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) logs = parsed;
+          }
+        } catch (e) {}
+        if (inMemoryReviewLogs.length > 0) {
+          const sig = (x) => `${x.raceDate || ""}_${x.venue}_${x.raceNo}_${x.actualCombo}_${x.seriesName || ""}`;
+          const seen = new Set(logs.map(sig));
+          inMemoryReviewLogs.forEach(item => {
+            if (!seen.has(sig(item))) { logs.unshift(item); seen.add(sig(item)); }
+          });
+        }
+        if (Array.isArray(INJECTED_SERVER_LOGS) && INJECTED_SERVER_LOGS.length > 0) {
+          const sig = (x) => `${x.raceDate || ""}_${x.venue}_${x.raceNo}_${x.actualCombo}_${x.seriesName || ""}`;
+          const seen = new Set(logs.map(sig));
+          INJECTED_SERVER_LOGS.forEach(item => {
+            if (!seen.has(sig(item))) { logs.push(item); seen.add(sig(item)); }
+          });
+        }
+        inMemoryReviewLogs = logs;
+        return logs;
+      }
       let allDetailsOpen = false;
       let latestReportParts = { free: "", paid: "", full: "" };
       let latestSimContext = null;
@@ -2013,7 +2066,7 @@ const UIManager = {
           recentLogs: logs.slice(0, 30),
           updatedAt: new Date().toLocaleTimeString()
         };
-        try { localStorage.setItem("BOATRACE_LEARNED_PARAMS", JSON.stringify(learnedObj)); } catch (e) {}
+        safeSetStorage("BOATRACE_LEARNED_PARAMS", JSON.stringify(learnedObj));
         return learnedObj;
       }
 
@@ -2043,13 +2096,7 @@ const UIManager = {
           return a === f1 && b === f2;
         });
 
-        let logs = [];
-        try {
-          const raw = localStorage.getItem("BOATRACE_REVIEW_LOGS");
-          if (raw) logs = JSON.parse(raw);
-        } catch (e) {}
-        if (!Array.isArray(logs)) logs = [];
-
+        let logs = loadMergedReviewLogs();
         const kimMap = { nige: "逃げ", sashi: "差し", makuri: "まくり", makurisashi: "まくり差し", nuki: "抜き" };
         logs.unshift({
           venue, seriesName, seriesKey, raceNo, grade, actualCombo, kimarite,
@@ -2058,14 +2105,19 @@ const UIManager = {
           payout: 0,
           isHit, missedThirdOnly: !isHit && has1st2nd
         });
-
-        try { localStorage.setItem("BOATRACE_REVIEW_LOGS", JSON.stringify(logs)); } catch (e) {}
-        rebuildLearnedParamsFromLogs(logs);
+        inMemoryReviewLogs = logs;
+        safeSetStorage("BOATRACE_REVIEW_LOGS", JSON.stringify(logs));
+        const builtLearned = rebuildLearnedParamsFromLogs(logs);
         const serSel = document.getElementById("learnedSeriesSelect");
         if (serSel) {
           serSel.dataset.preferredSeries = seriesKey;
         }
-        applyLearnedFeedbackParams(false);
+        applyLearnedFeedbackParams(false, builtLearned);
+        const qToast = document.getElementById("quickSaveToast");
+        if (qToast) {
+          qToast.textContent = `✅ 蓄積完了！【${venue} ${raceNo}R（${seriesName}）確定:${actualCombo} / ${kimMap[kimarite] || "逃げ"}】を学習DBに追加し即時反映しました（全${logs.length}R蓄積）`;
+          qToast.classList.remove("hidden");
+        }
       }
 
       function resetLearnedFeedback() {
@@ -2078,28 +2130,27 @@ const UIManager = {
         runSimulation();
       }
 
-      function applyLearnedFeedbackParams(promptIfMissing = false) {
-        let parsed = null;
-        try {
-          const rawLogs = localStorage.getItem("BOATRACE_REVIEW_LOGS");
-          if (rawLogs) {
-            const logsArr = JSON.parse(rawLogs);
+      function applyLearnedFeedbackParams(promptIfMissing = false, directParsed = null) {
+        let parsed = directParsed;
+        if (!parsed) {
+          try {
+            const logsArr = loadMergedReviewLogs();
             if (Array.isArray(logsArr) && logsArr.length > 0) {
               parsed = rebuildLearnedParamsFromLogs(logsArr);
             }
-          }
-          if (!parsed) {
-            const saved = localStorage.getItem("BOATRACE_LEARNED_PARAMS");
-            if (saved) parsed = JSON.parse(saved);
-          }
-        } catch (e) {}
+            if (!parsed) {
+              const saved = safeGetStorage("BOATRACE_LEARNED_PARAMS");
+              if (saved) parsed = JSON.parse(saved);
+            }
+          } catch (e) {}
+        }
 
         if ((!parsed || parsed.type !== "BOATRACE_LEARNED_PARAMS") && promptIfMissing) {
           const raw = prompt("振り返りサイトの「🧠 蓄積データから学習パラメータを生成・コピー」でコピーした学習データ(JSON)を貼り付けてください：");
           if (raw) {
             try {
               parsed = JSON.parse(raw.trim());
-              localStorage.setItem("BOATRACE_LEARNED_PARAMS", JSON.stringify(parsed));
+              safeSetStorage("BOATRACE_LEARNED_PARAMS", JSON.stringify(parsed));
             } catch (e) {}
           }
         }
@@ -5110,6 +5161,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
                 💾 レース結果を学習データに蓄積
               </button>
             </div>
+            <div id="saveReviewToast" class="hidden text-[11px] font-bold text-emerald-200 bg-emerald-950/80 border border-emerald-500/60 rounded px-2.5 py-1.5"></div>
 
             <!-- 5段階解剖レポート -->
             <div id="retrospectiveDetailBox" class="text-xs leading-relaxed text-slate-200 bg-slate-950/90 border border-slate-800 rounded-lg p-3 space-y-2.5"></div>
@@ -5176,6 +5228,38 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
     <script>
       let reviewBoats = {};
       let reviewLogs = [];
+      const INJECTED_SERVER_LOGS = []; // __INJECTED_SERVER_LOGS_MARKER__
+
+      function safeGetStorage(key) {
+        try { const v = window.localStorage.getItem(key); if (v !== null) return v; } catch (e) {}
+        try { if (window.parent && window.parent !== window && window.parent.localStorage) { const v = window.parent.localStorage.getItem(key); if (v !== null) return v; } } catch (e) {}
+        try { const v = window.sessionStorage.getItem(key); if (v !== null) return v; } catch (e) {}
+        try { if (window.parent && window.parent.__BOATRACE_MEM_STORE__ && key in window.parent.__BOATRACE_MEM_STORE__) return window.parent.__BOATRACE_MEM_STORE__[key]; } catch (e) {}
+        try { if (window.__BOATRACE_MEM_STORE__ && key in window.__BOATRACE_MEM_STORE__) return window.__BOATRACE_MEM_STORE__[key]; } catch (e) {}
+        return null;
+      }
+
+      function safeSetStorage(key, val) {
+        try { window.localStorage.setItem(key, val); } catch (e) {}
+        try { if (window.parent && window.parent !== window && window.parent.localStorage) window.parent.localStorage.setItem(key, val); } catch (e) {}
+        try { window.sessionStorage.setItem(key, val); } catch (e) {}
+        try {
+          if (window.parent) {
+            window.parent.__BOATRACE_MEM_STORE__ = window.parent.__BOATRACE_MEM_STORE__ || {};
+            window.parent.__BOATRACE_MEM_STORE__[key] = val;
+          }
+        } catch (e) {}
+        window.__BOATRACE_MEM_STORE__ = window.__BOATRACE_MEM_STORE__ || {};
+        window.__BOATRACE_MEM_STORE__[key] = val;
+      }
+
+      function safeRemoveStorage(key) {
+        try { window.localStorage.removeItem(key); } catch (e) {}
+        try { if (window.parent && window.parent !== window && window.parent.localStorage) window.parent.localStorage.removeItem(key); } catch (e) {}
+        try { window.sessionStorage.removeItem(key); } catch (e) {}
+        try { if (window.parent && window.parent.__BOATRACE_MEM_STORE__) delete window.parent.__BOATRACE_MEM_STORE__[key]; } catch (e) {}
+        if (window.__BOATRACE_MEM_STORE__) delete window.__BOATRACE_MEM_STORE__[key];
+      }
 
       const VENUE_CODE_TO_NAME = {
         "01": "桐生", "02": "戸田", "03": "江戸川", "04": "平和島", "05": "多摩川", "06": "浜名湖",
@@ -5928,10 +6012,15 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           stDiffKado
         });
         try {
-          localStorage.setItem("BOATRACE_REVIEW_LOGS", JSON.stringify(reviewLogs));
+          safeSetStorage("BOATRACE_REVIEW_LOGS", JSON.stringify(reviewLogs));
         } catch (e) {}
         computeAndSaveLearnedParams();
         renderReviewLogs();
+        const toastEl = document.getElementById("saveReviewToast");
+        if (toastEl) {
+          toastEl.textContent = `✅ 蓄積完了！【${venue} ${raceNo}R（${seriesName}）確定:${actualCombo} / ${KIMARITE_LABELS[kimarite] || "逃げ"}】を全体・場別・節別の学習DBに保存しました（現在 ${reviewLogs.length}R 蓄積）`;
+          toastEl.classList.remove("hidden");
+        }
       }
 
 
@@ -6027,7 +6116,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         };
 
         try {
-          localStorage.setItem("BOATRACE_LEARNED_PARAMS", JSON.stringify(learnedObj));
+          safeSetStorage("BOATRACE_LEARNED_PARAMS", JSON.stringify(learnedObj));
         } catch (e) {}
 
         const prevEl = document.getElementById("learnedParamsPreview");
@@ -6064,8 +6153,8 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
       function clearReviewLogs() {
         reviewLogs = [];
         try {
-          localStorage.removeItem("BOATRACE_REVIEW_LOGS");
-          localStorage.removeItem("BOATRACE_LEARNED_PARAMS");
+          safeRemoveStorage("BOATRACE_REVIEW_LOGS");
+          safeRemoveStorage("BOATRACE_LEARNED_PARAMS");
         } catch (e) {}
         const prevEl = document.getElementById("learnedParamsPreview");
         if (prevEl) prevEl.textContent = "蓄積データをリセットしました。";
@@ -6244,10 +6333,10 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         const dateEl = document.getElementById("fetchDateInput");
         if (dateEl) dateEl.value = `${yyyy}-${mm}-${dd}`;
 
-        // 過去に保存した蓄積ログをlocalStorageから復元（上書き消去しない！）
+        // 過去に保存した蓄積ログを復元（ブラウザ＋サーバー蓄積を統合・重複排除）
         let loadedFromStorage = false;
         try {
-          const savedLogs = localStorage.getItem("BOATRACE_REVIEW_LOGS");
+          const savedLogs = safeGetStorage("BOATRACE_REVIEW_LOGS");
           if (savedLogs) {
             const parsed = JSON.parse(savedLogs);
             if (Array.isArray(parsed) && parsed.length > 0) {
@@ -6256,6 +6345,18 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
             }
           }
         } catch (e) {}
+        if (Array.isArray(INJECTED_SERVER_LOGS) && INJECTED_SERVER_LOGS.length > 0) {
+          const sig = (x) => `${x.raceDate || ""}_${x.venue}_${x.raceNo}_${x.actualCombo}`;
+          const existing = new Set(reviewLogs.map(sig));
+          INJECTED_SERVER_LOGS.forEach(item => {
+            if (!existing.has(sig(item))) {
+              reviewLogs.push(item);
+              existing.add(sig(item));
+            }
+          });
+          loadedFromStorage = reviewLogs.length > 0;
+          safeSetStorage("BOATRACE_REVIEW_LOGS", JSON.stringify(reviewLogs));
+        }
 
         loadSampleCase("makuri_hit");
         if (INJECTED_REVIEW_DATA && INJECTED_REVIEW_DATA.status === "ok") {
@@ -6273,6 +6374,81 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
   </body>
 </html>
 """
+
+SERVER_REVIEW_LOGS_FILE = "/tmp/boatrace_review_logs_db.json"
+
+
+def load_server_review_logs() -> list:
+    try:
+        if os.path.exists(SERVER_REVIEW_LOGS_FILE):
+            with open(SERVER_REVIEW_LOGS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
+    except Exception:
+        pass
+    return []
+
+
+def save_server_review_logs(logs: list):
+    try:
+        with open(SERVER_REVIEW_LOGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def append_server_review_log_from_result(rev_res: dict) -> tuple[bool, int]:
+    """サーバー取得した公式結果をPython側の学習DB(session_state + JSON)に蓄積"""
+    if not rev_res or rev_res.get("status") != "ok":
+        return False, len(st.session_state.get("server_review_logs", []))
+    meta = rev_res.get("meta", {})
+    finish = rev_res.get("finish", [1, 2, 3])
+    actual_combo = "-".join(str(x) for x in finish[:3])
+    kim = rev_res.get("kimarite", "nige")
+    kim_map = {"nige": "逃げ", "sashi": "差し", "makuri": "まくり", "makurisashi": "まくり差し", "nuki": "抜き", "megumare": "恵まれ"}
+    venue = meta.get("venueName", "平和島")
+    series_name = meta.get("seriesName") or f"{meta.get('dateIso', '')[:7]} {venue}節"
+    series_key = f"{venue}｜{series_name}"
+    w_course = (rev_res.get("boats", {}).get(str(finish[0]), {}) or {}).get("course", finish[0])
+    if kim == "nige":
+        m1_pat = "clean_in"
+    elif kim == "sashi":
+        m1_pat = "c2_sashi_atk" if w_course == 2 else "in_flow"
+    elif kim == "makuri":
+        m1_pat = "c2_makuri_atk" if w_course == 2 else "center_makuri_atk"
+    elif kim == "makurisashi":
+        m1_pat = "outer_ms_atk" if w_course >= 5 else "center_ms_atk"
+    else:
+        m1_pat = "in_flow"
+
+    entry = {
+        "venue": venue,
+        "seriesName": series_name,
+        "seriesKey": series_key,
+        "raceDate": meta.get("dateIso", ""),
+        "raceNo": str(meta.get("rno", 12)),
+        "grade": meta.get("grade", "一般"),
+        "actualCombo": actual_combo,
+        "m1Combo": actual_combo,
+        "kimarite": kim,
+        "kimariteName": kim_map.get(kim, "逃げ"),
+        "firstMarkPat": m1_pat,
+        "dochuType": "overtake_1st" if kim == "nuki" else "none",
+        "dochuReason": "turn_power" if kim == "nuki" else "none",
+        "payout": rev_res.get("payout3t", 0),
+        "isHit": False,
+        "isM1Hit": False,
+        "missedThirdOnly": False,
+    }
+    logs = list(st.session_state.get("server_review_logs", []))
+    sig = f"{entry['raceDate']}_{entry['venue']}_{entry['raceNo']}_{entry['actualCombo']}"
+    logs = [x for x in logs if f"{x.get('raceDate', '')}_{x.get('venue', '')}_{x.get('raceNo', '')}_{x.get('actualCombo', '')}" != sig]
+    logs.insert(0, entry)
+    st.session_state["server_review_logs"] = logs
+    save_server_review_logs(logs)
+    return True, len(logs)
+
 
 def main():
     st.set_page_config(page_title="BOAT RACE 展開シミュレーター PHASE 2 PRO Complete", page_icon="🚤", layout="wide")
@@ -6294,10 +6470,12 @@ def main():
     if "server_review_data" not in st.session_state:
         st.session_state["server_review_data"] = None
         st.session_state["review_status_banner"] = (
-            "💡 日付・レース場・Rを選んで「🏁 公式結果・配当・実ST 自動取得」を押すと、サーバー直結で確定着順・3連単/2連単配当・人気・決まり手・本番STが自動反映されます。"
+            "💡 日付・レース場・Rを選んで「🏁 公式結果・配当・実ST 自動取得」を押すと、サーバー直結で確定着順・決まり手・節名・本番STが自動反映されます。"
         )
+    if "server_review_logs" not in st.session_state:
+        st.session_state["server_review_logs"] = load_server_review_logs()
 
-    c_mode, c_date, c_venue, c_rno, c_btn, c_odds = st.columns([1.6, 0.95, 1.35, 0.7, 1.5, 1.1])
+    c_mode, c_date, c_venue, c_rno, c_btn, c_odds = st.columns([1.6, 0.95, 1.35, 0.7, 1.5, 1.2])
     with c_mode:
         app_mode = st.radio(
             "ツール切替",
@@ -6323,20 +6501,33 @@ def main():
                     if rev_res.get("status") == "ok":
                         st.session_state["server_review_data"] = rev_res
                         f_str = "-".join(str(x) for x in rev_res.get("finish", []))
-                        p3 = rev_res.get("payout3t", 0)
-                        p2 = rev_res.get("payout2t", 0)
+                        s_nm = rev_res.get("meta", {}).get("seriesName", "")
                         st.session_state["review_status_banner"] = (
-                            f"✅ 結果取得成功【{hd_str} {selected_venue[1]} {rno_int}R】：確定 {f_str} ／ 3連単 ¥{p3:,} ／ 2連単 ¥{p2:,}"
+                            f"✅ 結果取得成功【{hd_str} {selected_venue[1]} {rno_int}R / {s_nm}】：確定 {f_str}（右の「💾 サーバー学習DBに蓄積」で即保存できます）"
                         )
                     else:
                         st.error(rev_res.get("message", "結果取得エラー"))
         with c_odds:
             st.write("")
-            if st.button("🧹 結果データリセット", use_container_width=True):
-                st.session_state["server_review_data"] = None
-                st.session_state["review_status_banner"] = (
-                    "💡 結果データをリセットしました。上のバーから日付・場・Rを選んで「🏁 公式結果・配当・実ST 自動取得」を押してください。"
-                )
+            srv_cnt = len(st.session_state.get("server_review_logs", []))
+            if st.button(f"💾 サーバー学習DBに蓄積 ({srv_cnt}R)", use_container_width=True):
+                rev_res = st.session_state.get("server_review_data")
+                if not rev_res or rev_res.get("status") != "ok":
+                    with st.spinner(f"{selected_venue[1]} {rno_int}R を公式から取得して蓄積中..."):
+                        rev_res = fetch_race_result_for_review(hd_str, jcd_str, rno_int)
+                        if rev_res.get("status") == "ok":
+                            st.session_state["server_review_data"] = rev_res
+                if rev_res and rev_res.get("status") == "ok":
+                    ok, total_cnt = append_server_review_log_from_result(rev_res)
+                    if ok:
+                        f_str = "-".join(str(x) for x in rev_res.get("finish", []))
+                        s_nm = rev_res.get("meta", {}).get("seriesName", "")
+                        st.session_state["review_status_banner"] = (
+                            f"✅ 学習DBに蓄積完了！（現在 {total_cnt}R 蓄積）【{selected_venue[1]} {rno_int}R / {s_nm} / 確定 {f_str}】→ 予想シミュレーターへ自動連携済"
+                        )
+                        st.rerun()
+                else:
+                    st.error((rev_res or {}).get("message", "先に公式結果を取得してください。"))
     else:
         with c_btn:
             st.write("")
@@ -6375,17 +6566,27 @@ def main():
     banner_key = "review_status_banner" if app_mode == "🔬 結果振り返りサイト" else "status_banner"
     st.caption(st.session_state.get(banner_key, "") + active_info)
 
+    server_logs_json = json.dumps(st.session_state.get("server_review_logs", []), ensure_ascii=False)
+
     if app_mode == "🔬 結果振り返りサイト":
         rev_payload = json.dumps(st.session_state["server_review_data"], ensure_ascii=False)
         rendered_reviewer = EMBEDDED_REVIEWER_HTML.replace(
             "null; // __INJECTED_REVIEW_DATA_MARKER__",
             rev_payload + ";",
             1,
+        ).replace(
+            "[]; // __INJECTED_SERVER_LOGS_MARKER__",
+            server_logs_json + ";",
+            1,
         )
         components.html(rendered_reviewer, height=1750, scrolling=True)
     else:
         json_payload = json.dumps(st.session_state["server_race_data"], ensure_ascii=False)
-        rendered_html = ULTIMATE_HTML_TEMPLATE.replace("__INJECTED_SERVER_DATA__", json_payload)
+        rendered_html = ULTIMATE_HTML_TEMPLATE.replace("__INJECTED_SERVER_DATA__", json_payload).replace(
+            "[]; // __INJECTED_SERVER_LOGS_MARKER__",
+            server_logs_json + ";",
+            1,
+        )
         components.html(rendered_html, height=2750, scrolling=True)
 
 
