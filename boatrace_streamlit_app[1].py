@@ -896,6 +896,7 @@ ULTIMATE_HTML_TEMPLATE = r"""<!doctype html>
                 <option value="center_makuri_atk" selected>🔥 3・4C絞りまくり仕掛け</option>
                 <option value="center_nosqueeze_atk">🌊 3・4C絞らないまくり(ツケマイ)</option>
                 <option value="center_ms_atk">⚡ 3・4Cまくり差し</option>
+                <option value="outer_ms_atk">⚡ 5・6C外からまくり差し</option>
                 <option value="clash_wait">💥 1Mやり合い→展開待ち浮上</option>
               </select>
             </div>
@@ -1826,7 +1827,7 @@ const UIManager = {
       let boatsData = (typeof DEFAULT_BOATS_DATA !== 'undefined' && DEFAULT_BOATS_DATA) ? JSON.parse(JSON.stringify(DEFAULT_BOATS_DATA)) : {};
       let liveOddsMap = {};
       let settledPayoutInfo = null;
-      let learnedBias = { inModAdj: 0, makuriModAdj: 0, sashiModAdj: 0, waitBonusAdj: 0, sampleCount: 0 };
+      let learnedBias = { inModAdj: 0, makuriModAdj: 0, sashiModAdj: 0, makurisashiModAdj: 0, waitBonusAdj: 0, sampleCount: 0 };
       let allDetailsOpen = false;
       let latestReportParts = { free: "", paid: "", full: "" };
       let latestSimContext = null;
@@ -1906,8 +1907,9 @@ const UIManager = {
         if (!Array.isArray(logs) || logs.length === 0) return null;
         const total = logs.length;
         const nigeCnt = logs.filter(x => x.kimarite === "nige").length;
-        const m1MakuriAtkCnt = logs.filter(x => ["center_makuri_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length;
-        const sashiCnt = logs.filter(x => x.kimarite === "sashi" || x.kimarite === "makurisashi").length;
+        const m1MakuriAtkCnt = logs.filter(x => ["center_makuri_atk", "center_nosqueeze_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length;
+        const sashiCnt = logs.filter(x => x.kimarite === "sashi").length;
+        const makurisashiCnt = logs.filter(x => x.kimarite === "makurisashi" || ["center_ms_atk", "outer_ms_atk"].includes(x.firstMarkPat)).length;
         const dochuOvertakeCnt = logs.filter(x => x.dochuType && x.dochuType !== "none").length;
         const turnPowerCnt = logs.filter(x => x.dochuReason === "turn_power" || x.dochuReason === "racer_skill").length;
         const clashWaitCnt = logs.filter(x => x.firstMarkPat === "clash_wait").length;
@@ -1916,16 +1918,18 @@ const UIManager = {
         const nigeRatio = nigeCnt / total;
         const makuriRatio = m1MakuriAtkCnt / total;
         const sashiRatio = sashiCnt / total;
+        const makurisashiRatio = makurisashiCnt / total;
         const dochuRatio = dochuOvertakeCnt / total;
 
-        const w_course = Math.min(180, Math.max(70, Math.round((100 + (sashiRatio - 0.25) * 85 + (nigeRatio - 0.50) * 35) / 5) * 5));
+        const w_course = Math.min(180, Math.max(70, Math.round((100 + (sashiRatio + makurisashiRatio - 0.25) * 85 + (nigeRatio - 0.50) * 35) / 5) * 5));
         const w_exhibit = Math.min(190, Math.max(80, Math.round((105 + dochuRatio * 55 + (turnPowerCnt / total) * 45) / 5) * 5));
-        const w_motor = Math.min(190, Math.max(80, Math.round((100 + dochuRatio * 60 + sashiRatio * 35) / 5) * 5));
-        const w_slit = Math.min(190, Math.max(80, Math.round((100 + (makuriRatio - 0.20) * 130) / 5) * 5));
+        const w_motor = Math.min(190, Math.max(80, Math.round((100 + dochuRatio * 60 + (sashiRatio + makurisashiRatio) * 35) / 5) * 5));
+        const w_slit = Math.min(190, Math.max(80, Math.round((100 + (makuriRatio - 0.20) * 130 + makurisashiRatio * 35) / 5) * 5));
 
         const inModAdj = Math.round((nigeRatio - 0.52) * 24);
         const makuriModAdj = Math.round((makuriRatio - 0.22) * 28);
-        const sashiModAdj = Math.round((sashiRatio - 0.24) * 26);
+        const sashiModAdj = Math.round((sashiRatio - 0.16) * 26);
+        const makurisashiModAdj = Math.round((makurisashiRatio - 0.14) * 30);
         const waitBonusAdj = Math.min(22, thirdMissCnt * 5 + clashWaitCnt * 6 + dochuOvertakeCnt * 3);
 
         const venueBiases = {};
@@ -1939,14 +1943,16 @@ const UIManager = {
           const list = byVenue[v];
           const vc = list.length;
           const vNige = list.filter(x => x.kimarite === "nige").length / vc;
-          const vMak = list.filter(x => ["center_makuri_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length / vc;
-          const vSas = list.filter(x => x.kimarite === "sashi" || x.kimarite === "makurisashi").length / vc;
+          const vMak = list.filter(x => ["center_makuri_atk", "center_nosqueeze_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length / vc;
+          const vSas = list.filter(x => x.kimarite === "sashi").length / vc;
+          const vMs = list.filter(x => x.kimarite === "makurisashi" || ["center_ms_atk", "outer_ms_atk"].includes(x.firstMarkPat)).length / vc;
           const vWait = list.filter(x => x.missedThirdOnly || x.firstMarkPat === "clash_wait" || (x.dochuType && x.dochuType !== "none")).length;
           venueBiases[v] = {
             count: vc,
             inModAdj: Math.round((vNige - 0.52) * 24),
             makuriModAdj: Math.round((vMak - 0.22) * 28),
-            sashiModAdj: Math.round((vSas - 0.24) * 26),
+            sashiModAdj: Math.round((vSas - 0.16) * 26),
+            makurisashiModAdj: Math.round((vMs - 0.14) * 30),
             waitBonusAdj: Math.min(22, vWait * 5)
           };
         });
@@ -1957,7 +1963,7 @@ const UIManager = {
           hitRate: Math.round((logs.filter(x => x.isHit).length / total) * 100),
           dochuRate: Math.round(dochuRatio * 100),
           weights: { w_course, w_exhibit, w_motor, w_slit },
-          bias: { inModAdj, makuriModAdj, sashiModAdj, waitBonusAdj },
+          bias: { inModAdj, makuriModAdj, sashiModAdj, makurisashiModAdj, waitBonusAdj },
           venueBiases,
           recentLogs: logs.slice(0, 20),
           updatedAt: new Date().toLocaleTimeString()
@@ -2009,7 +2015,7 @@ const UIManager = {
       }
 
       function resetLearnedFeedback() {
-        learnedBias = { inModAdj: 0, makuriModAdj: 0, sashiModAdj: 0, waitBonusAdj: 0, sampleCount: 0 };
+        learnedBias = { inModAdj: 0, makuriModAdj: 0, sashiModAdj: 0, makurisashiModAdj: 0, waitBonusAdj: 0, sampleCount: 0 };
         setWeightPreset(100, 100, 100, 100);
         const badge = document.getElementById("learnedCountBadge");
         if (badge) badge.textContent = "補正オフ (標準100%)";
@@ -2067,7 +2073,7 @@ const UIManager = {
           if (bar) {
             bar.innerHTML = `🧠 <strong>全${parsed.sampleCount || 1}レースの振り返りデータ（道中逆転率 ${parsed.dochuRate || 0}%）を自動学習・適用中！</strong><br>` +
               `・自動最適化された重み付け：<strong>[①コース実績:${parsed.weights.w_course}% ／ ②展示気配:${parsed.weights.w_exhibit}% ／ ③勝率・機力:${parsed.weights.w_motor}% ／ ④スリット連動:${parsed.weights.w_slit}%]</strong><br>` +
-              `・現在の水面・展開バイアス補正（${vName}）：<strong>[イン補正 ${learnedBias.inModAdj >= 0 ? "+" : ""}${learnedBias.inModAdj} ／ まくり補正 ${learnedBias.makuriModAdj >= 0 ? "+" : ""}${learnedBias.makuriModAdj} ／ 差し補正 ${learnedBias.sashiModAdj >= 0 ? "+" : ""}${learnedBias.sashiModAdj} ／ 3着展開待ち・道中浮上ボーナス +${learnedBias.waitBonusAdj}]</strong>`;
+              `・現在の水面・展開バイアス補正（${vName}）：<strong>[イン補正 ${learnedBias.inModAdj >= 0 ? "+" : ""}${learnedBias.inModAdj} ／ まくり補正 ${learnedBias.makuriModAdj >= 0 ? "+" : ""}${learnedBias.makuriModAdj} ／ まくり差し補正 ${(learnedBias.makurisashiModAdj || 0) >= 0 ? "+" : ""}${learnedBias.makurisashiModAdj || 0} ／ 差し補正 ${learnedBias.sashiModAdj >= 0 ? "+" : ""}${learnedBias.sashiModAdj} ／ 3着展開待ち・道中浮上ボーナス +${learnedBias.waitBonusAdj}]</strong>`;
           }
 
           const qList = document.getElementById("quickAccumulatedList");
@@ -2821,7 +2827,7 @@ const UIManager = {
 
           const envSashiAdj = (windDir === "tail" ? windSpeed * 0.8 : 0) + (tide === "high" ? 1.5 : 0) + vSashiMod * 0.4 + (b.visTurn * 1.5);
           const envMakuriAdj = (windDir === "head" ? windSpeed * 0.9 : 0) + (tide === "low" ? 1.8 : 0) + vMakuriMod * 0.45 + (isKado ? 3.5 : 0) + (b.visSlit * 1.8);
-          const envMsAdj = (isKado ? 2.5 : 0) + (b.visTurn * 1.4) + (b.visSlit * 1.2) + vSashiMod * 0.3;
+          const envMsAdj = (isKado ? 2.5 : 0) + (b.visTurn * 1.4) + (b.visSlit * 1.2) + vSashiMod * 0.2 + (learnedBias.makurisashiModAdj || 0) * 0.45;
 
           const effSashiRate = Math.max(0.5, Math.min(55.0, (b.sashiRate ?? 10.0) + envSashiAdj));
           const effMakuriRate = courseNo === 1
@@ -4664,6 +4670,9 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           <button onclick="loadSampleCase('in_hit')" class="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-500/40 px-2 py-1 rounded">
             例③: イン逃げ的中
           </button>
+          <button onclick="loadSampleCase('makurisashi_hit')" class="bg-slate-800 hover:bg-slate-700 text-fuchsia-300 border border-fuchsia-500/40 px-2 py-1 rounded">
+            例④: 3Cまくり差し的中
+          </button>
           <a href="https://x.com/Boatrace__daisu" target="_blank" rel="noopener" class="bg-slate-900 hover:bg-slate-800 text-white border border-slate-600 px-2 py-1 rounded font-bold">
             𝕏 @Boatrace__daisu
           </a>
@@ -4841,8 +4850,10 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
                     <option value="in_flow">🌊 インが先マイもターン膨らみ/流れ</option>
                     <option value="c2_sashi_atk">📐 2コースが鋭く差し切り/肉薄</option>
                     <option value="c2_makuri_atk">🔥 2コースがジカまくり仕掛け</option>
-                    <option value="center_makuri_atk" selected>🔥 3・4コースがまくり仕掛け(内被弾)</option>
+                    <option value="center_makuri_atk" selected>🔥 3・4コースが絞りまくり仕掛け(内被弾)</option>
+                    <option value="center_nosqueeze_atk">🌊 3・4コースが絞らないまくり(ツケマイ)</option>
                     <option value="center_ms_atk">⚡ 3・4コースがまくり差し突き抜け</option>
+                    <option value="outer_ms_atk">⚡ 5・6コースが外からまくり差し突き抜け</option>
                     <option value="clash_wait">💥 1Mで内と攻め艇がやり合い(展開待ち浮上)</option>
                   </select>
                 </div>
@@ -5080,6 +5091,35 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
             5: { id: 5, course: 5, name: "茅原 悠紀", exTime: 6.75, preSt: 0.14, actualSt: 0.13, m1Action: "展開待ち最内", m1Rank: 3, rank: 3 },
             6: { id: 6, course: 6, name: "池田 浩二", exTime: 6.81, preSt: 0.16, actualSt: 0.17, m1Action: "展開待ち", m1Rank: 6, rank: 6 }
           };
+        } else if (mode === "makurisashi_hit") {
+          document.getElementById("revVenue").value = "尼崎";
+          document.getElementById("revRaceNo").value = "12";
+          document.getElementById("revGrade").value = "G1";
+          document.getElementById("fin1").value = "3";
+          document.getElementById("fin2").value = "1";
+          document.getElementById("fin3").value = "5";
+          document.getElementById("actualKimarite").value = "makurisashi";
+          document.getElementById("payoutYen").value = "5420";
+          document.getElementById("payout2tYen").value = "1680";
+          document.getElementById("payoutPop").value = "18";
+          document.getElementById("actualWindDir").value = "向かい風";
+          document.getElementById("actualWindSpeed").value = "3";
+          document.getElementById("actualKado").value = "4";
+          document.getElementById("preExpectedScenario").value = "makurisashi";
+          document.getElementById("prePredictedBets").value = "3-1-2, 3-1-4, 3-1-5, 3-4-1, 3-4-5, 1-3-5";
+          document.getElementById("preInvestPerBet").value = "1000";
+          document.getElementById("preComment").value = "3号艇の回り足とスリット気配が抜群。1のイン先マイの懐を3がまくり差しで突き抜け、1残し＋外連動の5を3着押さえ。";
+          document.getElementById("firstMarkPattern").value = "center_ms_atk";
+          document.getElementById("dochuOvertakeType").value = "none";
+          document.getElementById("dochuReason").value = "none";
+          reviewBoats = {
+            1: { id: 1, course: 1, name: "峰 竜太", exTime: 6.77, preSt: 0.13, actualSt: 0.14, m1Action: "先マイ膨らみ", m1Rank: 2, rank: 2 },
+            2: { id: 2, course: 2, name: "毒島 誠", exTime: 6.80, preSt: 0.16, actualSt: 0.18, m1Action: "差し追走", m1Rank: 4, rank: 4 },
+            3: { id: 3, course: 3, name: "桐生 順平", exTime: 6.71, preSt: 0.11, actualSt: 0.10, m1Action: "まくり差し一閃", m1Rank: 1, rank: 1 },
+            4: { id: 4, course: 4, name: "池田 浩二", exTime: 6.76, preSt: 0.14, actualSt: 0.15, m1Action: "外マイ", m1Rank: 5, rank: 5 },
+            5: { id: 5, course: 5, name: "茅原 悠紀", exTime: 6.73, preSt: 0.13, actualSt: 0.12, m1Action: "展開待ち最内", m1Rank: 3, rank: 3 },
+            6: { id: 6, course: 6, name: "丸野 一樹", exTime: 6.83, preSt: 0.18, actualSt: 0.19, m1Action: "引き波被弾", m1Rank: 6, rank: 6 }
+          };
         } else {
           document.getElementById("revVenue").value = "大村";
           document.getElementById("revRaceNo").value = "12";
@@ -5313,7 +5353,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         } else if (kim === "makuri") {
           document.getElementById("firstMarkPattern").value = "center_makuri_atk";
         } else if (kim === "makurisashi") {
-          document.getElementById("firstMarkPattern").value = "center_ms_atk";
+          document.getElementById("firstMarkPattern").value = (wBoat && wBoat.course >= 5) ? "outer_ms_atk" : "center_ms_atk";
         } else if (kim === "nuki") {
           document.getElementById("firstMarkPattern").value = "in_flow";
         }
@@ -5342,7 +5382,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           if (d.id === f1) {
             if (kim === "nige") d.m1Action = "先マイ逃走";
             else if (kim === "makuri") d.m1Action = "まくり敢行";
-            else if (kim === "makurisashi") d.m1Action = "まくり差し連動";
+            else if (kim === "makurisashi") d.m1Action = "まくり差し一閃";
             else if (kim === "sashi") d.m1Action = "1M差し抜け";
             else d.m1Action = "差し追走";
             d.m1Rank = kim === "nuki" ? 2 : 1;
@@ -5399,7 +5439,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
             <td class="py-1 text-center font-mono text-[10px] ${diffCls}">${diffStr} (${diffLabel})</td>
             <td class="py-1 text-center">
               <select onchange="updateRevBoat(${b},'m1Action',this.value)" class="text-[10px] py-0.5 px-1 text-amber-200">
-                ${["先マイ逃走","先マイ膨らみ","まくり敢行","まくり不発(抵抗被弾)","まくり差し連動","1M差し抜け","差し追走","二番差し","外マイ","展開待ち最内","引き波被弾","凹み・壁崩壊"].map(act => `<option value="${act}" ${(d.m1Action || "差し追走") === act ? "selected" : ""}>${act}</option>`).join("")}
+                ${["先マイ逃走","先マイ膨らみ","まくり敢行","まくり不発(抵抗被弾)","まくり差し一閃","まくり差し連動","1M差し抜け","差し追走","二番差し","外マイ","展開待ち最内","引き波被弾","凹み・壁崩壊"].map(act => `<option value="${act}" ${(d.m1Action || "差し追走") === act ? "selected" : ""}>${act}</option>`).join("")}
               </select>
             </td>
             <td class="py-1 text-center"><input type="number" min="1" max="6" value="${d.m1Rank ?? d.rank}" onchange="updateRevBoat(${b},'m1Rank',parseInt(this.value,10))" class="w-10 text-center font-bold text-sky-300" title="1周1M出口時点の順位" /></td>
@@ -5541,8 +5581,10 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         let why2nd3rdText = "";
         if (kimarite === "makuri") {
           why2nd3rdText = `${f1}号艇（${b1.name}）が本番ST .${Math.round(b1.actualSt*100).toString().padStart(2,"0")}から豪快にまくったことで内枠勢が引き波に沈み、マーク外側から連動した<strong>${f2}号艇（${b2.name}）</strong>と、1マークのもつれ・引き波を最内「展開待ち」で突いた<strong>${f3}号艇（${b3.name}）</strong>が浮上する典型的な『まくり外連動スジ』で決着しました。`;
-        } else if (kimarite === "sashi" || kimarite === "makurisashi") {
-          why2nd3rdText = `1マークで先マイを図ったインに対し、<strong>${f1}号艇（${b1.name}）</strong>がブイ際を鋭く${kimariteName}突破。差された${f2}号艇（${b2.name}）が2着に踏みとどまり、3着には引き波を避けて展開待ちから差した<strong>${f3}号艇（${b3.name}）</strong>が食い込みました。`;
+        } else if (kimarite === "makurisashi") {
+          why2nd3rdText = `1マークで先マイした1コースと外へ握った攻め艇の間にできた懐を、<strong>${f1}号艇（${b1.name}）</strong>が本番ST .${Math.round(b1.actualSt*100).toString().padStart(2,"0")}から鋭く『まくり差し』で突き抜け。押し切られたイン残し・連動艇の<strong>${f2}号艇（${b2.name}）</strong>が2着に踏みとどまり、3着には引き波を避けて小回り追走した<strong>${f3}号艇（${b3.name}）</strong>が入る典型的な『まくり差しスジ』で決着しました。`;
+        } else if (kimarite === "sashi") {
+          why2nd3rdText = `1マークで先マイを図ったインに対し、<strong>${f1}号艇（${b1.name}）</strong>がブイ際を鋭く差し突破。差された${f2}号艇（${b2.name}）が2着に踏みとどまり、3着には引き波を避けて展開待ちから差した<strong>${f3}号艇（${b3.name}）</strong>が食い込みました。`;
         } else if (kimarite === "nige") {
           why2nd3rdText = `1コース<strong>${f1}号艇（${b1.name}）</strong>が本番ST .${Math.round(b1.actualSt*100).toString().padStart(2,"0")}から完璧な先マイで押し切り。2着には順当に差し・外マイ追走した<strong>${f2}号艇（${b2.name}）</strong>、3着には道中連絡みした<strong>${f3}号艇（${b3.name}）</strong>が入りました。`;
         } else {
@@ -5555,7 +5597,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         } else if (has1st2ndHit) {
           reflectionAdvice = `🔍 <strong>【3着抜けの原因解剖】</strong> 1着${f1}号艇・2着${f2}号艇の本線ラインは完璧に読めていましたが、3着に入った<strong>${f3}号艇（${b3.name}）</strong>が抜けています。1マークで${kimariteName}が起きた際、外枠や展開待ちの艇（${f3}号艇）が最内を小回りして3着に浮上するパターンを「展開待ち連対率」でケアするのが次回の改善ポイントです。`;
         } else if (has1stHit) {
-          reflectionAdvice = `🔍 <strong>【2着スジ抜けの原因解剖】</strong> 1着アタマ（${f1}号艇・${kimariteName}）の狙いは的中していましたが、2着に入った<strong>${f2}号艇（${b2.name}）</strong>へのスジ連動が抜けていました。${kimarite === "makuri" ? "まくり決着時は内枠ではなく『まくった艇の1つ外（" + f2 + "号艇）』を2着筆頭に置くスジ鉄則" : "差し決着時は『1コースの2着残り』を最優先するスジ鉄則"}を徹底すると取りこぼしがなくなります。`;
+          reflectionAdvice = `🔍 <strong>【2着スジ抜けの原因解剖】</strong> 1着アタマ（${f1}号艇・${kimariteName}）の狙いは的中していましたが、2着に入った<strong>${f2}号艇（${b2.name}）</strong>へのスジ連動が抜けていました。${kimarite === "makuri" ? "まくり決着時は内枠ではなく『まくった艇の1つ外（" + f2 + "号艇）』を2着筆頭に置くスジ鉄則" : (kimarite === "makurisashi" ? "まくり差し決着時は『1コースの2着残り』と『外連動艇』を2着筆頭に置くスジ鉄則" : "差し決着時は『1コースの2着残り』を最優先するスジ鉄則")}を徹底すると取りこぼしがなくなります。`;
         } else {
           reflectionAdvice = `🔍 <strong>【展開逆行の原因解剖】</strong> 事前は「${preScenario === "nige" ? "イン逃げ本線" : "別展開"}」を想定していましたが、本番は<strong>${dokaText}</strong>したことでスリット隊形が一変し、<strong>${f1}号艇の「${kimariteName}」</strong>が決まりました。${windDir}${windSpeed}mの水面条件と壁役の信頼度を再点検する必要があります。`;
         }
@@ -5598,9 +5640,14 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
             <p>🔧 <strong>1. 重み付けスライダー調整：</strong> 本日の${venue}水面（${windDir}${windSpeed}m）ではダッシュ・スリット攻めが強く決まっています。予想シミュレーターの<strong>「④ スリット＆戦法連動ボーナス比重」を 140%〜160%</strong> に引き上げてください。</p>
             <p>🔧 <strong>2. 手動1M攻め設定：</strong> カド受け（${kado - 1}コース）のSTが不安な番組では、カド（${kado}コース）に<strong>「🔥まくり」</strong>、その外隣に<strong>「⚡まくり差し」または「⏳展開待ち」</strong>を指定した【🟥パターンB（イン逃げ以外）】の比重を高めると高配当を仕留められます。</p>
           `;
-        } else if (kimarite === "sashi" || kimarite === "makurisashi") {
+        } else if (kimarite === "makurisashi") {
           prescriptionHtml = `
-            <p>🔧 <strong>1. コース別攻め成功率の重視：</strong> ターンマーク際の「差し・まくり差し」が決まる水面です。予想シミュレーターの<strong>「① コース別実績・攻め成功率比重」を 130%〜150%</strong> に上げ、2コース差し率・3/4コースまくり差し率が高い選手を素直に狙ってください。</p>
+            <p>🔧 <strong>1. まくり差し水面への適合：</strong> センター〜外枠の「⚡まくり差し」が決まりやすい水面です。予想シミュレーターの<strong>「① コース別実績・攻め成功率比重」を 130%〜150%</strong>、<strong>「③ モーター機力比重（回り足・出足）」を 120%〜140%</strong> に引き上げてください。</p>
+            <p>🔧 <strong>2. まくり差しスジ買い目設定：</strong> 3・4・5コースでまくり差し率＆周回タイムが良い選手に手動で<strong>「⚡まくり差し」</strong>を指定し、2着は<strong>イン残し（1号艇）＋外連動艇</strong>、3着は展開待ち広めのフォーメーションにすると${actualCombo}のような好配当を的確に捉えられます。</p>
+          `;
+        } else if (kimarite === "sashi") {
+          prescriptionHtml = `
+            <p>🔧 <strong>1. コース別攻め成功率の重視：</strong> ターンマーク際の「差し」が決まる水面です。予想シミュレーターの<strong>「① コース別実績・攻め成功率比重」を 130%〜150%</strong> に上げ、2コース差し率が高い選手を素直に狙ってください。</p>
             <p>🔧 <strong>2. 3着ヒモ穴対策：</strong> 差し決着の3着には<strong>「⏳展開待ち連対率」</strong>が50%を超える外枠選手を3着流しに加えると、${actualCombo}のような中穴〜万舟を取りこぼしません。</p>
           `;
         } else {
@@ -5733,28 +5780,31 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
         const total = reviewLogs.length;
         const nigeCnt = reviewLogs.filter(x => x.kimarite === "nige").length;
         const makuriCnt = reviewLogs.filter(x => x.kimarite === "makuri").length;
-        const sashiCnt = reviewLogs.filter(x => x.kimarite === "sashi" || x.kimarite === "makurisashi").length;
+        const sashiCnt = reviewLogs.filter(x => x.kimarite === "sashi").length;
+        const makurisashiCnt = reviewLogs.filter(x => x.kimarite === "makurisashi" || ["center_ms_atk", "outer_ms_atk"].includes(x.firstMarkPat)).length;
         const thirdMissCnt = reviewLogs.filter(x => x.missedThirdOnly).length;
 
         const dochuOvertakeCnt = reviewLogs.filter(x => x.dochuType && x.dochuType !== "none").length;
         const turnPowerCnt = reviewLogs.filter(x => x.dochuReason === "turn_power" || x.dochuReason === "racer_skill").length;
         const clashWaitCnt = reviewLogs.filter(x => x.firstMarkPat === "clash_wait").length;
-        const m1MakuriAtkCnt = reviewLogs.filter(x => ["center_makuri_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length;
+        const m1MakuriAtkCnt = reviewLogs.filter(x => ["center_makuri_atk", "center_nosqueeze_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length;
 
         const nigeRatio = nigeCnt / total;
         const makuriRatio = m1MakuriAtkCnt / total;
         const sashiRatio = sashiCnt / total;
+        const makurisashiRatio = makurisashiCnt / total;
         const dochuRatio = dochuOvertakeCnt / total;
 
         // 1M展開要因（スリット・コース攻め）と道中逆転要因（展示気配・モーター・実力）を分離して重み付け学習
-        const w_course = Math.min(180, Math.max(70, Math.round((100 + (sashiRatio - 0.25) * 85 + (nigeRatio - 0.50) * 35) / 5) * 5));
+        const w_course = Math.min(180, Math.max(70, Math.round((100 + (sashiRatio + makurisashiRatio - 0.25) * 85 + (nigeRatio - 0.50) * 35) / 5) * 5));
         const w_exhibit = Math.min(190, Math.max(80, Math.round((105 + dochuRatio * 55 + (turnPowerCnt / total) * 45) / 5) * 5));
-        const w_motor = Math.min(190, Math.max(80, Math.round((100 + dochuRatio * 60 + sashiRatio * 35) / 5) * 5));
-        const w_slit = Math.min(190, Math.max(80, Math.round((100 + (makuriRatio - 0.20) * 130) / 5) * 5));
+        const w_motor = Math.min(190, Math.max(80, Math.round((100 + dochuRatio * 60 + (sashiRatio + makurisashiRatio) * 35) / 5) * 5));
+        const w_slit = Math.min(190, Math.max(80, Math.round((100 + (makuriRatio - 0.20) * 130 + makurisashiRatio * 35) / 5) * 5));
 
         const inModAdj = Math.round((nigeRatio - 0.52) * 24);
         const makuriModAdj = Math.round((makuriRatio - 0.22) * 28);
-        const sashiModAdj = Math.round((sashiRatio - 0.24) * 26);
+        const sashiModAdj = Math.round((sashiRatio - 0.16) * 26);
+        const makurisashiModAdj = Math.round((makurisashiRatio - 0.14) * 30);
         const waitBonusAdj = Math.min(22, thirdMissCnt * 5 + clashWaitCnt * 6 + dochuOvertakeCnt * 3);
 
         // 会場別（24場別）の蓄積バイアスも個別に計算して保持
@@ -5769,14 +5819,16 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           const list = byVenue[v];
           const vc = list.length;
           const vNige = list.filter(x => x.kimarite === "nige").length / vc;
-          const vMak = list.filter(x => ["center_makuri_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length / vc;
-          const vSas = list.filter(x => x.kimarite === "sashi" || x.kimarite === "makurisashi").length / vc;
+          const vMak = list.filter(x => ["center_makuri_atk", "center_nosqueeze_atk", "c2_makuri_atk", "clash_wait"].includes(x.firstMarkPat) || x.kimarite === "makuri").length / vc;
+          const vSas = list.filter(x => x.kimarite === "sashi").length / vc;
+          const vMs = list.filter(x => x.kimarite === "makurisashi" || ["center_ms_atk", "outer_ms_atk"].includes(x.firstMarkPat)).length / vc;
           const vWait = list.filter(x => x.missedThirdOnly || x.firstMarkPat === "clash_wait" || (x.dochuType && x.dochuType !== "none")).length;
           venueBiases[v] = {
             count: vc,
             inModAdj: Math.round((vNige - 0.52) * 24),
             makuriModAdj: Math.round((vMak - 0.22) * 28),
-            sashiModAdj: Math.round((vSas - 0.24) * 26),
+            sashiModAdj: Math.round((vSas - 0.16) * 26),
+            makurisashiModAdj: Math.round((vMs - 0.14) * 30),
             waitBonusAdj: Math.min(22, vWait * 5)
           };
         });
@@ -5788,7 +5840,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
           m1HitRate: Math.round((reviewLogs.filter(x => x.isM1Hit || x.isHit).length / total) * 100),
           dochuRate: Math.round(dochuRatio * 100),
           weights: { w_course, w_exhibit, w_motor, w_slit },
-          bias: { inModAdj, makuriModAdj, sashiModAdj, waitBonusAdj },
+          bias: { inModAdj, makuriModAdj, sashiModAdj, makurisashiModAdj, waitBonusAdj },
           venueBiases,
           recentLogs: reviewLogs.slice(0, 20),
           updatedAt: new Date().toLocaleTimeString()
@@ -5800,7 +5852,7 @@ EMBEDDED_REVIEWER_HTML = r"""<!doctype html>
 
         const prevEl = document.getElementById("learnedParamsPreview");
         if (prevEl) {
-          prevEl.innerHTML = `全<strong>${total}R</strong>の蓄積結果から算出 → 推奨重み付け: <strong>[①コース:${w_course}% / ②展示:${w_exhibit}% / ③機力:${w_motor}% / ④スリット:${w_slit}%]</strong> ｜ 補正: <strong>[イン${inModAdj >= 0 ? "+" : ""}${inModAdj} / まくり${makuriModAdj >= 0 ? "+" : ""}${makuriModAdj} / 差し${sashiModAdj >= 0 ? "+" : ""}${sashiModAdj} / 3着展開待ち+${waitBonusAdj}]</strong> （ブラウザ自動同期済）`;
+          prevEl.innerHTML = `全<strong>${total}R</strong>の蓄積結果から算出 → 推奨重み付け: <strong>[①コース:${w_course}% / ②展示:${w_exhibit}% / ③機力:${w_motor}% / ④スリット:${w_slit}%]</strong> ｜ 補正: <strong>[イン${inModAdj >= 0 ? "+" : ""}${inModAdj} / まくり${makuriModAdj >= 0 ? "+" : ""}${makuriModAdj} / まくり差し${makurisashiModAdj >= 0 ? "+" : ""}${makurisashiModAdj} / 差し${sashiModAdj >= 0 ? "+" : ""}${sashiModAdj} / 3着展開待ち+${waitBonusAdj}]</strong> （ブラウザ自動同期済）`;
         }
         return learnedObj;
       }
